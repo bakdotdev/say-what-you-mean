@@ -12,8 +12,15 @@
  */
 import { wordParity, type deriveKeys } from "../codec"
 
-/** Frequency rank below which a word is treated as a function word. */
-const FUNCTION_WORD_RANK = 320
+/**
+ * The wordlist is the Google 10k common-English list first, then the long tail
+ * of the full dictionary. Candidates must come from a band inside that first
+ * portion: past the function words ("this", "be", "more"), but well short of
+ * the tail, which is full of archaic and technical junk ("holp", "jota",
+ * "dighting"). Both extremes wreck the prose in opposite ways.
+ */
+const FUNCTION_WORD_RANK = 300
+const COMMON_WORD_LIMIT = 9000
 
 export const OPTIONS_PER_SLOT = 24
 
@@ -35,31 +42,26 @@ export const candidatesFor = async (
   used: Set<string>,
 ): Promise<string[]> => {
   const want = 1 - (await wordParity(word, keys))
-  const isFunctionWord = vocabulary.indexOf(word) >= 0 &&
-    vocabulary.indexOf(word) < FUNCTION_WORD_RANK
+  const rank = vocabulary.indexOf(word)
+  const isFunctionWord = rank >= 0 && rank < FUNCTION_WORD_RANK
 
   const near: string[] = []
   const wide: string[] = []
 
-  // Stride-sample the vocabulary so candidates come from across the frequency
-  // range, not just the most common words. The stride is coprime-ish with the
-  // list length so it wanders rather than clustering.
-  const n = vocabulary.length
-  if (n === 0) return []
-  const stride = 7919
-  const start = Math.floor(Math.random() * n)
+  // Search the common band, starting at a random point within it so repeated
+  // slots don't all draw the same words.
+  const lo = isFunctionWord ? 0 : FUNCTION_WORD_RANK
+  const hi = Math.min(vocabulary.length, COMMON_WORD_LIMIT)
+  const span = hi - lo
+  if (span <= 0) return []
+  const start = lo + Math.floor(Math.random() * span)
 
   let probes = 0
-  for (let i = 0; i < n && probes < 9000; i++) {
+  for (let i = 0; i < span && probes < 6000; i++) {
     if (near.length >= OPTIONS_PER_SLOT) break
-    const idx = (start + i * stride) % n
-    const candidate = vocabulary[idx]
+    const candidate = vocabulary[lo + ((start - lo + i) % span)]
     if (!candidate || candidate === word || used.has(candidate)) continue
-
-    // Replacing a content word with "the" reads terribly; skip function words
-    // unless the original was one itself.
-    if (!isFunctionWord && idx < FUNCTION_WORD_RANK) continue
-    // Very short words carry little meaning and rarely fit.
+    // Very short words carry little meaning and rarely fit a content slot.
     if (!isFunctionWord && candidate.length < 4) continue
 
     probes++
