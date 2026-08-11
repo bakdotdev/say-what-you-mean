@@ -16,8 +16,8 @@ import {
   deriveKeys,
   planEmbedding,
   tokenizeSpans,
-  wordParity,
 } from "../codec"
+import { candidatesFor } from "./candidates"
 
 export interface RewriteState {
   busy: boolean
@@ -27,33 +27,7 @@ export interface RewriteState {
   total: number
 }
 
-const OPTIONS_PER_SLOT = 24
 const CONTEXT_WORDS = 4
-
-/** Candidate words that flip this slot's parity, widest-fit first. */
-const optionsFor = async (
-  word: string,
-  keys: Awaited<ReturnType<typeof deriveKeys>>,
-  vocabulary: readonly string[],
-  used: Set<string>,
-): Promise<string[]> => {
-  const want = 1 - (await wordParity(word, keys))
-  const near: string[] = []
-  const wide: string[] = []
-  let probes = 0
-  for (const candidate of vocabulary) {
-    if (near.length + wide.length >= OPTIONS_PER_SLOT * 2 || probes++ > 12000)
-      break
-    if (candidate === word || used.has(candidate)) continue
-    if ((await wordParity(candidate, keys)) !== want) continue
-    const delta = Math.abs(candidate.length - word.length)
-    if (delta <= 2) near.push(candidate)
-    else if (delta <= 5) wide.push(candidate)
-  }
-  // Similar-length words first — they read better — then a wider net so the
-  // model has genuine semantic choice rather than five near-identical stubs.
-  return [...near, ...wide].slice(0, OPTIONS_PER_SLOT)
-}
 
 export function useAiRewrite() {
   const [state, setState] = useState<RewriteState>({
@@ -104,7 +78,7 @@ export function useAiRewrite() {
         for (const slot of plan.flips) {
           const span = spans[slot]
           if (!span) continue
-          const options = await optionsFor(span.word, keys, vocabulary, used)
+          const options = await candidatesFor(span.word, keys, vocabulary, used)
           if (!options.length) continue
           const from = Math.max(0, slot - CONTEXT_WORDS)
           const to = Math.min(words.length, slot + CONTEXT_WORDS + 1)

@@ -13,8 +13,8 @@ import {
   deriveKeys,
   planEmbedding,
   tokenizeSpans,
-  wordParity,
 } from "../codec"
+import { candidatesFor } from "./candidates"
 
 export interface GeneratorState {
   busy: boolean
@@ -38,29 +38,6 @@ const TOPICS = [
 ]
 
 const MAX_ROUNDS = 3
-const OPTIONS_PER_SLOT = 24
-
-const optionsFor = async (
-  word: string,
-  keys: Awaited<ReturnType<typeof deriveKeys>>,
-  vocabulary: readonly string[],
-  used: Set<string>,
-): Promise<string[]> => {
-  const want = 1 - (await wordParity(word, keys))
-  const near: string[] = []
-  const wide: string[] = []
-  let probes = 0
-  for (const candidate of vocabulary) {
-    if (near.length + wide.length >= OPTIONS_PER_SLOT * 2 || probes++ > 12000)
-      break
-    if (candidate === word || used.has(candidate)) continue
-    if ((await wordParity(candidate, keys)) !== want) continue
-    const delta = Math.abs(candidate.length - word.length)
-    if (delta <= 2) near.push(candidate)
-    else if (delta <= 5) wide.push(candidate)
-  }
-  return [...near, ...wide].slice(0, OPTIONS_PER_SLOT)
-}
 
 export function useCarrierGenerator() {
   const [state, setState] = useState<GeneratorState>({
@@ -127,7 +104,7 @@ export function useCarrierGenerator() {
           for (const slot of plan.flips) {
             const span = spans[slot]
             if (!span) continue
-            const options = await optionsFor(span.word, keys, vocabulary, used)
+            const options = await candidatesFor(span.word, keys, vocabulary, used)
             if (!options.length) continue
             specs.push({
               slot,
