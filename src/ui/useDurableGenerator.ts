@@ -20,6 +20,7 @@
  */
 import { useCallback, useState } from "react"
 import { createEncoder, tokenizeSpans, type Encoder } from "../codec"
+import { isCarrierWord } from "../codec/equations"
 
 export interface DurableGenState {
   busy: boolean
@@ -80,7 +81,7 @@ export function useDurableGenerator() {
       setState({ busy: true, stage: "choosing vocabulary…", error: null })
       try {
         const base = import.meta.env.BASE_URL
-        const encoder = await createEncoder(secret, passphrase, 1)
+        const encoder = await createEncoder(secret, passphrase, 1, true)
 
         // Whether a word fits depends only on the word and the key, so the
         // usable vocabulary is knowable before any text exists.
@@ -91,6 +92,15 @@ export function useDurableGenerator() {
           0,
         )
         const allowedSet = new Set(allowed)
+        // Carrier membership is key-only, so it can be memoised per word.
+        const carrierCache = new Map<string, boolean>()
+        const isCarrier = async (word: string) => {
+          const hit = carrierCache.get(word)
+          if (hit !== undefined) return hit
+          const value = isCarrierWord(await encoder.digestsFor(word))
+          carrierCache.set(word, value)
+          return value
+        }
 
         const chosenTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)]
         const kept: { sentence: string; strays: number }[] = []
@@ -129,12 +139,19 @@ export function useDurableGenerator() {
           const { carrier } = (await res.json()) as { carrier?: string }
           if (!carrier) continue
 
-          // Keep the sentences needing least repair; discard the rest.
+          // Only CARRIER words have to fit; junk words are ignored by the
+          // decoder, so they never count as strays however unusual they are.
           for (const sentence of sentencesOf(carrier)) {
             const words = tokenizeSpans(sentence).map((s) => s.word)
             if (words.length < 4) continue
-            const strays = words.filter((w) => !allowedSet.has(w)).length
-            if (strays / words.length <= MAX_STRAY_RATIO) {
+            let carriers = 0
+            let strays = 0
+            for (const w of words) {
+              if (!(await isCarrier(w))) continue
+              carriers++
+              if (!allowedSet.has(w)) strays++
+            }
+            if (carriers === 0 || strays / carriers <= MAX_STRAY_RATIO) {
               kept.push({ sentence, strays })
             }
           }

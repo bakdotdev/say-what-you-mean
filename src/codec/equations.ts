@@ -110,6 +110,28 @@ export const equationsFor = (
     .map(({ methodId, digest }) => equationFromDigest(digest, B, methodId))
 }
 
+/**
+ * Carrier selection.
+ *
+ * A word carries a clue only if its keyed digest says so. The test depends on
+ * the KEY ALONE, never on the payload, so the decoder can apply it to received
+ * text without knowing the secret — which is what makes the remaining words
+ * genuinely free. Those "junk" words are ignored end to end, so prose can be
+ * written around the carriers instead of every word having to fit.
+ *
+ * 1 in 3 carries: enough density to reach the payload in a few hundred words,
+ * while leaving two thirds of the text unconstrained.
+ */
+export const JUNK_MODULUS = 3
+
+export const isCarrierWord = (fd: WordFeatureDigests): boolean => {
+  const digest = fd.features[0]?.digest
+  if (!digest) return false
+  // Byte 6 is unused by equationFromDigest (which reads 0-4 and the last),
+  // so carrier selection stays independent of the equation it produces.
+  return digest[6] % JUNK_MODULUS === 0
+}
+
 /** Whether an equation is satisfied by the true payload. */
 export const isSatisfied = (equation: Equation, payload: Bit[]): boolean => {
   let p = 0

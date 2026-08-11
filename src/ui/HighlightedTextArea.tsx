@@ -44,11 +44,14 @@ const SHARED =
  * 1:1 with the text by construction, not by someone remembering to update it.
  */
 export const MARK_STYLES: Record<Mark["kind"], string> = {
-  locked: "bg-accent/45 shadow-[0_0_0_3px] shadow-accent/45",
-  carrier: "bg-accent/15 shadow-[0_0_0_3px] shadow-accent/15",
-  // Outline only — these words are already doing their job, so they should
-  // read as marked-but-settled rather than competing with the fills.
-  required: "outline outline-1 outline-accent/25",
+  // Fills hug the glyphs exactly — no shadow spread, no padding — so a marked
+  // word occupies the same box as an unmarked one and the backdrop stays in
+  // register with the textarea.
+  locked: "bg-accent/45",
+  carrier: "bg-accent/15",
+  // Outline only: these words are already doing their job, so they read as
+  // marked-but-settled rather than competing with the fills.
+  required: "outline outline-1 -outline-offset-1 outline-accent/25",
   plain: "",
 }
 

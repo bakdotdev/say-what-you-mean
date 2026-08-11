@@ -15,6 +15,7 @@ import { deriveKeys } from "./keys"
 import { parsePayload, payloadBitLength } from "./payload"
 import {
   equationsFor,
+  isCarrierWord,
   wordDigests,
   type Equation,
   type WordFeatureDigests,
@@ -92,11 +93,19 @@ export const decode = async (
   }
 
   let best: Diagnostics = base
-  // Legacy per-word scheme: try each density (older carriers still decode).
+  // Per-word scheme. Tried twice: once ignoring junk words (the key marks
+  // which words carry, so the decoder can skip the rest without knowing the
+  // payload), and once using every word, so carriers made before junk words
+  // existed still decode.
+  const tokenSets: WordFeatureDigests[][] = [
+    perToken.filter((fd) => isCarrierWord(fd)),
+    perToken,
+  ]
+  for (const tokens of tokenSets) {
   for (let density = MAX_DENSITY; density >= 1; density--) {
     for (let n = 1; n <= MAX_SECRET_LENGTH; n++) {
       const B = payloadBitLength(n)
-      const all = perToken.flatMap((fd) => equationsFor(fd, B, density))
+      const all = tokens.flatMap((fd) => equationsFor(fd, B, density))
       const rows = consistentRows(all)
       if (rows === null) continue // contradiction -> wrong density
       const { bits, determined } = solve(rows, B)
@@ -112,6 +121,7 @@ export const decode = async (
       const parsed = await parsePayload(bits, n, keys)
       if (parsed) return { secret: parsed.secret, diagnostics: diag }
     }
+  }
   }
   return { secret: null, diagnostics: best }
 }

@@ -50,7 +50,7 @@ export function useDurablePlan(
       try {
         // Density 1 keeps ~50% of words usable, which is the most forgiving
         // setting — the generator has to replace the fewest words.
-        const encoder = await createEncoder(secret, passphrase, 1)
+        const encoder = await createEncoder(secret, passphrase, 1, true)
         const state = await encoder.evaluate(carrier)
         if (runId.current !== id) return
         const unfit = state.words

@@ -67,6 +67,14 @@ export function HideView({
     ? durablePlan.state !== null && !durablePlan.busy
     : status.plan !== null
 
+  const junkSet = useMemo(() => {
+    const set = new Set<number>()
+    durablePlan.state?.words.forEach((w, i) => {
+      if (w.junk) set.add(i)
+    })
+    return set
+  }, [durablePlan.state])
+
   const marks: Mark[] = useMemo(
     () =>
       spans.map<Mark>((span, i) => ({
@@ -77,18 +85,20 @@ export function HideView({
           ? "locked"
           : flipSet.has(i)
             ? "carrier"
-            : hasPlan
-              ? "required"
-              : "plain",
+            : junkSet.has(i) || !hasPlan
+              ? "plain"
+              : "required",
         title: lockedSet.has(i)
           ? "locked — click to unlock"
           : flipSet.has(i)
             ? "being changed — click to lock it"
-            : hasPlan
-              ? "carrying a clue — click to lock"
-              : "click to lock",
+            : junkSet.has(i)
+              ? "free — carries nothing, write anything here"
+              : hasPlan
+                ? "carrying a clue — click to lock"
+                : "click to lock",
       })),
-    [spans, flipSet, lockedSet, hasPlan],
+    [spans, flipSet, lockedSet, hasPlan, junkSet],
   )
 
   const toggleLock = useCallback((slot: number) => {
@@ -286,6 +296,10 @@ export function HideView({
             WORD
           </span>
           LOCKED BY YOU
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="font-mono text-muted">WORD</span>
+          FREE
         </span>
         <span>CLICK TO LOCK</span>
       </div>

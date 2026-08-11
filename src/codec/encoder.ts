@@ -18,6 +18,7 @@ import { deriveKeys, type Keys } from "./keys"
 import { buildPayload, parsePayload, payloadBitLength } from "./payload"
 import {
   equationsFor,
+  isCarrierWord,
   isSatisfied,
   wordDigests,
   type Equation,
@@ -48,6 +49,11 @@ export interface WordReport {
   green: boolean
   satisfied: number
   total: number
+  /**
+   * True when the key says this word carries nothing. Junk words are ignored
+   * by the decoder, so they are free text — the writer may use any word here.
+   */
+  junk: boolean
 }
 
 export interface EncodeState {
@@ -103,6 +109,7 @@ export const createEncoder = async (
   secret: string,
   passphrase: string,
   density: number = DENSITY_PRESETS.balanced,
+  junkAware = false,
 ): Promise<Encoder> => {
   const keys: Keys = await deriveKeys(passphrase)
   const payload: Bit[] = await buildPayload(secret, keys)
@@ -122,6 +129,21 @@ export const createEncoder = async (
     (await parsePayload(bits, n, keys)) !== null
 
   const reportFor = (fd: WordFeatureDigests): [WordReport, Equation[]] => {
+    // Junk words carry nothing and are skipped by the decoder, so they can be
+    // anything at all — never report them as needing to change.
+    if (junkAware && !isCarrierWord(fd)) {
+      return [
+        {
+          word: fd.word,
+          agreement: 1,
+          green: true,
+          satisfied: 0,
+          total: 0,
+          junk: true,
+        },
+        [],
+      ]
+    }
     const eqs = equationsFor(fd, B, density)
     const good = eqs.filter((e) => isSatisfied(e, payload))
     const ratio = eqs.length === 0 ? 0 : good.length / eqs.length
@@ -134,6 +156,7 @@ export const createEncoder = async (
         green: eqs.length > 0 && good.length === eqs.length,
         satisfied: good.length,
         total: eqs.length,
+        junk: false,
       },
       good,
     ]
