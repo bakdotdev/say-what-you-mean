@@ -49,7 +49,6 @@ const MAX_RUNS = 4
 /** Vocabulary band scanned for fitting replacements. */
 const COMMON_BAND = 20000
 const REPLACEMENT_POOL = 6000
-const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 
 const TOPICS = [
@@ -193,11 +192,17 @@ export function useDurableGenerator() {
 /**
  * Replace every carrier word that does not fit.
  *
- * Replacements must be DISTINCT from each other and from words already in the
- * text: a repeated word repeats an equation it has already contributed, so
- * duplicates cost coverage without shortening the repair.
+ * Final replacements must be DISTINCT from each other and from words already
+ * in the text: a repeat contributes an equation the text already has, so it
+ * costs coverage without shortening the repair.
+ *
+ * Distinctness is enforced when a word is CHOSEN, not when it is offered.
+ * Reserving every option per slot burned twenty pool words per slot, so a few
+ * dozen slots exhausted the pool and every slot after that was silently left
+ * unrepaired — and one unfit carrier is enough to make the decoder reject the
+ * whole text, which is why generation kept running to 3000 words and failing.
  */
-async function repair(
+export async function repair(
   encoder: Encoder,
   carrier: string,
   fitting: readonly string[],
@@ -210,33 +215,30 @@ async function repair(
     .filter((i) => i >= 0)
   if (!unfit.length) return carrier
 
-  const used = new Set(spans.map((s) => s.word))
-  const specs: { slot: number; from: string; options: string[] }[] = []
-  for (const [n, slot] of unfit.entries()) {
+  const inText = new Set(spans.map((s) => s.word))
+  const available = fitting.filter((w) => w.length >= 3 && !inText.has(w))
+  if (!available.length) return carrier
+
+  // Overlapping option windows, so every slot gets a full set of candidates.
+  const specs = unfit.flatMap((slot, n) => {
     const span = spans[slot]
-    if (!span) continue
-    const seed = (n * 137) % Math.max(1, fitting.length)
-    const options: string[] = []
-    for (let i = 0; i < fitting.length && options.length < OPTIONS_PER_SLOT; i++) {
-      const word = fitting[(seed + i) % fitting.length]
-      if (used.has(word) || word.length < 3) continue
-      options.push(word)
-      if (options.length >= CANDIDATE_POOL) break
-    }
-    if (!options.length) continue
-    // Similar length reads least like a substitution.
-    options.sort(
+    if (!span) return []
+    const seed = (n * 137) % available.length
+    const options = Array.from({ length: OPTIONS_PER_SLOT }, (_, i) =>
+      available[(seed + i) % available.length],
+    ).sort(
       (a, b) =>
         Math.abs(a.length - span.word.length) -
         Math.abs(b.length - span.word.length),
     )
-    // Reserve them so no two slots can be offered the same word.
-    for (const word of options) used.add(word)
-    specs.push({ slot, from: span.word, options })
-  }
+    return [{ slot, from: span.word, options }]
+  })
   if (!specs.length) return carrier
 
   const chosen = new Map<number, string>()
+  // The rewrite endpoint caps how many slots it will consider, and a large
+  // carrier can exceed its size limit; either way it declines and the
+  // deterministic fallback below still repairs every slot.
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -261,13 +263,31 @@ async function repair(
     // Deterministic fallback below.
   }
 
+  // Resolve to distinct words, falling back through each slot's options and
+  // then through the pool at large, so no slot is ever left unrepaired.
+  const taken = new Set(inText)
+  const picked = new Map<number, string>()
+  let next = 0
+  for (const spec of specs) {
+    let word = chosen.get(spec.slot)
+    if (!word || taken.has(word)) {
+      word = spec.options.find((o) => !taken.has(o))
+    }
+    while (!word && next < available.length) {
+      const candidate = available[next++]
+      if (!taken.has(candidate)) word = candidate
+    }
+    if (!word) continue
+    taken.add(word)
+    picked.set(spec.slot, word)
+  }
+
   let out = carrier
   for (const spec of [...specs].sort((a, b) => b.slot - a.slot)) {
+    const word = picked.get(spec.slot)
+    if (!word) continue
     const span = spans[spec.slot]
-    out =
-      out.slice(0, span.start) +
-      (chosen.get(spec.slot) ?? spec.options[0]) +
-      out.slice(span.end)
+    out = out.slice(0, span.start) + word + out.slice(span.end)
   }
   return out
 }
