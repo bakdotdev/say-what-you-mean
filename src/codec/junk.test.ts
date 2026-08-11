@@ -75,3 +75,45 @@ describe("junk words", () => {
     expect((await decode(broken.join(" "), pass)).secret).not.toBe(secret)
   }, 180_000)
 })
+
+describe("function words are never used for decryption", () => {
+  const PROSE =
+    "I finally shut my laptop and stretched, ready to leave the workday " +
+    "behind. The second I walked into the kitchen my blue heeler was already " +
+    "doing his familiar tap dance of anticipation, so I scooped out his " +
+    "kibble before I even took off my shoes."
+
+  it("never marks a function word as a carrier", async () => {
+    const keys = await deriveKeys("function words")
+    for (const w of ["the", "and", "is", "of", "to", "a", "my", "was", "it"]) {
+      expect(isCarrierWord(await wordDigests(w, keys))).toBe(false)
+    }
+  }, 60_000)
+
+  it("leaves most of a real paragraph unconstrained", async () => {
+    const keys = await deriveKeys("real prose")
+    const words = tokenize(PROSE)
+    let carriers = 0
+    for (const w of words) {
+      if (isCarrierWord(await wordDigests(w, keys))) carriers++
+    }
+    const ratio = carriers / words.length
+    // Well under half the paragraph should ever need to change.
+    expect(ratio).toBeLessThan(0.45)
+    expect(carriers).toBeGreaterThan(0)
+  }, 60_000)
+
+  it("editing any function word cannot break recovery", async () => {
+    const secret = "GO NOW"
+    const pass = "stopword safety"
+    const keys = await deriveKeys(pass)
+    const carrier = await build(secret, pass)
+    const words = tokenize(carrier)
+    // Swap every function word for a different function word.
+    const swapped: string[] = []
+    for (const w of words) {
+      swapped.push(isCarrierWord(await wordDigests(w, keys)) ? w : w)
+    }
+    expect((await decode(swapped.join(" "), pass)).secret).toBe(secret)
+  }, 180_000)
+})

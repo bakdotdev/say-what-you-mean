@@ -20,7 +20,12 @@
 import type { Bit } from "./bytes"
 import { hmac, type Keys } from "./keys"
 import { textToBytes } from "./bytes"
-import { featuresOf, FEATURE_METHODS, MAX_DENSITY } from "./features"
+import {
+  featuresOf,
+  FEATURE_METHODS,
+  MAX_DENSITY,
+  isFunctionWord,
+} from "./features"
 
 export interface Equation {
   /** Distinct payload-bit indices, ascending. */
@@ -119,12 +124,16 @@ export const equationsFor = (
  * genuinely free. Those "junk" words are ignored end to end, so prose can be
  * written around the carriers instead of every word having to fit.
  *
- * 1 in 3 carries: enough density to reach the payload in a few hundred words,
- * while leaving two thirds of the text unconstrained.
+ * Function words never carry, whatever their hash says — they are
+ * unsubstitutable, so constraining them only fights the writer. Among the
+ * remaining content words, 1 in 2 carries, which keeps overall density close
+ * to the previous 1-in-3-of-everything while freeing all the connective
+ * tissue that makes prose read naturally.
  */
-export const JUNK_MODULUS = 3
+export const JUNK_MODULUS = 2
 
 export const isCarrierWord = (fd: WordFeatureDigests): boolean => {
+  if (isFunctionWord(fd.word)) return false
   const digest = fd.features[0]?.digest
   if (!digest) return false
   // Byte 6 is unused by equationFromDigest (which reads 0-4 and the last),

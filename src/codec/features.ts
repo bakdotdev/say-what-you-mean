@@ -94,3 +94,38 @@ export const featuresOf = (
   }
   return out
 }
+
+
+/**
+ * Function words are never used for decryption.
+ *
+ * You cannot swap "the" for a synonym — function words are unsubstitutable,
+ * so constraining them fights the writer and buys nothing. Content words
+ * (nouns, verbs, adjectives) do have alternatives, which is where a real
+ * choice exists, so that is where the constraint belongs.
+ *
+ * This list is fixed and shared, needing no key, so the decoder applies the
+ * same test to received text without any extra data.
+ */
+export const FUNCTION_WORDS: ReadonlySet<string> = new Set(
+  (
+    "a an the this that these those my your his her its our their whose " +
+    "i me you he him she it we us they them who whom which what " +
+    "am is are was were be been being do does did doing done have has had having " +
+    "will would shall should can could may might must ought " +
+    "and or but nor so yet for because although though while whereas since unless until " +
+    "if then than as when where why how whether either neither both " +
+    "of to in on at by from with without within into onto upon over under " +
+    "above below between among through during before after against about across " +
+    "around behind beside besides beyond down off out past toward towards up " +
+    "not no nor never none nothing nobody nowhere any anyone anything some someone " +
+    "something every everyone everything each all most more much many few fewer less " +
+    "least little other others another same such own very too also just only even " +
+    "there here now then once again still yet always often sometimes rarely " +
+    "one two three first next last new old good great well back way day time year " +
+    "s t re ve ll d m"
+  ).split(" "),
+)
+
+export const isFunctionWord = (word: string): boolean =>
+  FUNCTION_WORDS.has(word.toLowerCase())
