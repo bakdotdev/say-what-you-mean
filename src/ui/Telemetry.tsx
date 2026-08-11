@@ -15,12 +15,15 @@ export function Telemetry({
   bits,
   flips,
   locked,
+  /** Dim the panel and hold values at em-dash until there is a passphrase. */
+  inert = false,
 }: {
   carrier: string
   passphrase: string
   bits: number
   flips: number
   locked: number
+  inert?: boolean
 }) {
   const [syndrome, setSyndrome] = useState<string>("—")
 
@@ -53,25 +56,38 @@ export function Telemetry({
   const headroom = usable - bits
   const density = words ? (bits / words) : 0
 
+  const dash = (value: string) => (inert ? "—" : value)
+
   return (
-    <Panel title="telemetry">
-      <dl className="space-y-1 text-[10px] tracking-wider">
-        <Row k="syndrome" v={syndrome} mono />
-        <Row k="payload" v={`${bits} bits`} />
-        <Row k="cover" v={`${words} words / ${chars} chars`} />
-        <Row k="distinct" v={`${distinct}`} />
-        <Row k="avg word" v={`${avgLen.toFixed(1)} chars`} />
-        <Row k="usable slots" v={`${usable}`} />
+    <Panel
+      title="telemetry"
+      right={
+        inert ? (
+          <span className="text-[10px] tracking-wider text-muted">idle</span>
+        ) : undefined
+      }
+    >
+      <dl
+        className={
+          "space-y-1 text-[10px] tracking-wider " + (inert ? "opacity-40" : "")
+        }
+      >
+        <Row k="syndrome" v={dash(syndrome)} mono />
+        <Row k="payload" v={dash(`${bits} bits`)} />
+        <Row k="cover" v={dash(`${words} words / ${chars} chars`)} />
+        <Row k="distinct" v={dash(`${distinct}`)} />
+        <Row k="avg word" v={dash(`${avgLen.toFixed(1)} chars`)} />
+        <Row k="usable slots" v={dash(`${usable}`)} />
         <Row
           k="headroom"
-          v={headroom >= 0 ? `+${headroom}` : `${headroom}`}
-          warn={headroom < 0}
+          v={dash(headroom >= 0 ? `+${headroom}` : `${headroom}`)}
+          warn={!inert && headroom < 0}
         />
-        <Row k="load" v={`${(density * 100).toFixed(1)}% bits/word`} />
-        <Row k="changes" v={`${flips}`} />
+        <Row k="load" v={dash(`${(density * 100).toFixed(1)}% bits/word`)} />
+        <Row k="changes" v={dash(`${flips}`)} />
         <Row
           k="efficiency"
-          v={flips ? `${(bits / flips).toFixed(2)} bits/change` : "—"}
+          v={dash(flips ? `${(bits / flips).toFixed(2)} bits/change` : "—")}
         />
       </dl>
       <p className="mt-2 border-t border-edge pt-2 text-[9px] leading-relaxed tracking-wider text-muted">

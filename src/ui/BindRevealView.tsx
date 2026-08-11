@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { unbindSecret, lookupIdFromPassphrase } from "../codec"
 import { CopyableField, Field, Panel, Tag, TextArea, TextInput } from "./primitives"
 import { Columns } from "./Columns"
+import { Telemetry } from "./Telemetry"
 import { About } from "./About"
 import { DecryptText } from "./DecryptText"
 
@@ -125,6 +126,7 @@ export function BindRevealView() {
         </>
       }
       right={
+        <>
         <Panel
           title="output"
           right={
@@ -153,6 +155,15 @@ export function BindRevealView() {
             </p>
           )}
         </Panel>
+        <Telemetry
+          carrier={carrier}
+          passphrase={passphrase}
+          bits={opened ? opened.length * 6 : 0}
+          flips={0}
+          locked={0}
+          inert={!(carrier.trim() && passphrase)}
+        />
+        </>
       }
     />
   )

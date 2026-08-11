@@ -12,6 +12,7 @@ import {
   TextInput,
 } from "./primitives"
 import { Columns } from "./Columns"
+import { Telemetry } from "./Telemetry"
 import { About } from "./About"
 
 export function BindHideView() {
@@ -215,6 +216,15 @@ export function BindHideView() {
                     : "enter a secret, a passphrase and some carrier text"}
             </p>
           </Panel>
+
+          <Telemetry
+            carrier={carrier}
+            passphrase={passphrase}
+            bits={key ? (key.length / 2) * 8 : 0}
+            flips={0}
+            locked={0}
+            inert={!key}
+          />
 
           <Panel title="properties">
             <ul className="space-y-1 text-[10px] leading-relaxed tracking-wider text-muted">

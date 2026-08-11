@@ -3,6 +3,7 @@ import { decode, type DecodeResult } from "../codec"
 import { Field, Panel, Tag, TextArea, TextInput } from "./primitives"
 import { RevealOutput } from "./RevealOutput"
 import { Columns } from "./Columns"
+import { Telemetry } from "./Telemetry"
 import { About } from "./About"
 
 export function RevealView() {
@@ -65,6 +66,8 @@ export function RevealView() {
       <p className="text-[10px] tracking-[0.2em] text-muted">decoding…</p>
     ) : null
 
+  const ready = Boolean(carrier.trim() && passphrase)
+
   const outputPanel = result ? (
         <Panel
           title="output"
@@ -122,7 +125,21 @@ export function RevealView() {
       right={
         <>
           {busyLine}
-          {outputPanel}
+          {outputPanel ?? (
+            <Panel title="output" right={<Tag>idle</Tag>}>
+              <p className="text-[10px] leading-relaxed tracking-wider text-muted">
+                Paste the text and enter the passphrase.
+              </p>
+            </Panel>
+          )}
+          <Telemetry
+            carrier={carrier}
+            passphrase={passphrase}
+            bits={result?.diagnostics.bitsTotal ?? 0}
+            flips={0}
+            locked={0}
+            inert={!ready}
+          />
         </>
       }
     />

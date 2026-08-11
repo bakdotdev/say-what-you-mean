@@ -362,11 +362,13 @@ export function HideView({
     </Panel>
   )
 
-  const statusPanel = ready ? (
+  const statusPanel = (
     <Panel
       title="status"
       right={
-        status.busy ? (
+        !ready ? (
+          <Tag>idle</Tag>
+        ) : status.busy ? (
           <Tag>working</Tag>
         ) : status.problem ? (
           <Tag tone="red">blocked</Tag>
@@ -380,7 +382,7 @@ export function HideView({
       <div className="space-y-1.5">
         <Button
           onClick={generateCarrier}
-          disabled={generator.busy || durableGen.busy}
+          disabled={!ready || generator.busy || durableGen.busy}
           className="w-full"
         >
           {generator.busy || durableGen.busy
@@ -394,7 +396,7 @@ export function HideView({
         )}
         <Button
           onClick={aiRewrite}
-          disabled={embedded || flips.length === 0 || ai.busy || durable}
+          disabled={!ready || embedded || flips.length === 0 || ai.busy || durable}
           className="w-full"
         >
           {ai.busy ? "choosing…" : "pick words naturally"}
@@ -407,7 +409,7 @@ export function HideView({
         <Button
           variant="ghost"
           onClick={apply}
-          disabled={embedded || flips.length === 0 || applying}
+          disabled={!ready || embedded || flips.length === 0 || applying}
           className="w-full"
         >
           {applying ? "applying…" : `blunt swap ×${flips.length}`}
@@ -422,14 +424,16 @@ export function HideView({
         segments={28}
       />
       <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-        {status.problem
-          ? status.problem
-          : embedded
-            ? "Ready to copy."
-            : `${flips.length} words to change.`}
+        {!ready
+          ? "Enter a secret and passphrase to begin."
+          : status.problem
+            ? status.problem
+            : embedded
+              ? "Ready to copy."
+              : `${flips.length} words to change.`}
       </p>
     </Panel>
-  ) : null
+  )
 
   return (
     <Columns
@@ -463,15 +467,14 @@ export function HideView({
             />
           )}
           {statusPanel}
-          {ready && (
-            <Telemetry
-              carrier={carrier}
-              passphrase={passphrase}
-              bits={status.bits}
-              flips={flips.length}
-              locked={locked.length}
-            />
-          )}
+          <Telemetry
+            carrier={carrier}
+            passphrase={passphrase}
+            bits={status.bits}
+            flips={flips.length}
+            locked={locked.length}
+            inert={!ready}
+          />
         </>
       }
     />
