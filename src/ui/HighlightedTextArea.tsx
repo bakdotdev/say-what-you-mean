@@ -20,11 +20,12 @@ export interface Mark {
   start: number
   end: number
   /**
-   * `carrier` — being changed to carry the payload (faint fill).
-   * `locked`  — you pinned it; the solver will never touch it (stronger fill).
-   * `plain`   — untouched, but still clickable so any word can be locked.
+   * `carrier`  — being changed to carry the payload (faint fill).
+   * `locked`   — you pinned it; never touched (stronger fill).
+   * `required` — already carrying a clue; keep it (faint outline).
+   * `plain`    — carries nothing, but still clickable so it can be locked.
    */
-  kind: "locked" | "carrier" | "plain"
+  kind: "locked" | "carrier" | "required" | "plain"
   /** Index of the word in the tokenised carrier, for click handling. */
   slot?: number
   title?: string
@@ -45,6 +46,9 @@ const SHARED =
 export const MARK_STYLES: Record<Mark["kind"], string> = {
   locked: "bg-accent/45 shadow-[0_0_0_3px] shadow-accent/45",
   carrier: "bg-accent/15 shadow-[0_0_0_3px] shadow-accent/15",
+  // Outline only — these words are already doing their job, so they should
+  // read as marked-but-settled rather than competing with the fills.
+  required: "outline outline-1 outline-accent/25",
   plain: "",
 }
 

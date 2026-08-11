@@ -56,6 +56,8 @@ weather, a small domestic detail.
 
 Rules:
 - Plain everyday vocabulary. Common words, simple sentences.
+- ONE subject throughout. A single continuous account, not disconnected
+  observations.
 - No names of real people, no places that identify anyone, no numbers that
   look like data. Nothing memorable or quotable.
 - No lists, headings, quotes, emoji or markdown. Just flowing sentences.
@@ -74,8 +76,9 @@ from a supplied list.
 Rules:
 - EVERY word you write must appear in the list. This is absolute. If a word is
   not in the list you may not use it, however natural it would be.
-- The list is large and contains ordinary English, so write real sentences:
-  a note about the day, an errand, the weather, a domestic detail.
+- Write ONE continuous account with a single subject, start to finish. Every
+  sentence must follow from the last. Do not drift between unrelated scenes.
+- The list is large and contains ordinary English, so write real sentences.
 - Prefer sense over ambition. Short, plain sentences that genuinely read well
   are the goal; do not force unusual words in.
 - No names of real people, no numbers, nothing memorable or quotable.

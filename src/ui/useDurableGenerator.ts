@@ -92,6 +92,7 @@ export function useDurableGenerator() {
         )
         const allowedSet = new Set(allowed)
 
+        const chosenTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)]
         const kept: { sentence: string; strays: number }[] = []
 
         for (let run = 1; run <= MAX_RUNS; run++) {
@@ -101,7 +102,11 @@ export function useDurableGenerator() {
             error: null,
           })
 
-          const topic = TOPICS[(run - 1) % TOPICS.length]
+          // ONE topic for the whole generation. Rotating topics per run made
+          // the harvested sentences read as unrelated fragments — a kettle
+          // sentence beside a train-platform sentence — which is the main
+          // reason the result felt "all over the place".
+          const topic = chosenTopic
           const res = await fetch(`${base}api/generate`, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -155,6 +160,7 @@ export function useDurableGenerator() {
               `${base}api/generate`,
               proven,
               Math.round(tokenizeSpans(candidate).length * 1.15),
+              `${chosenTopic}, as one continuous account`,
             )
             if (polished) {
               const check = await encoder.evaluate(polished)
@@ -215,6 +221,7 @@ async function composeFrom(
   endpoint: string,
   provenWords: readonly string[],
   words: number,
+  topic: string,
 ): Promise<string | null> {
   try {
     const res = await fetch(endpoint, {
@@ -222,7 +229,7 @@ async function composeFrom(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         words,
-        topic: "one connected everyday account, start to finish",
+        topic,
         allowed: provenWords,
       }),
     })

@@ -71,12 +71,12 @@ export function HideView({
           ? "locked"
           : flipSet.has(i)
             ? "carrier"
-            : "plain",
+            : "required",
         title: lockedSet.has(i)
           ? "locked — click to unlock"
           : flipSet.has(i)
             ? "being changed — click to lock it"
-            : "click to lock",
+            : "carrying a clue — click to lock",
       })),
     [spans, flipSet, lockedSet],
   )
@@ -264,6 +264,12 @@ export function HideView({
             WORD
           </span>
           BEING CHANGED
+        </span>
+        <span className="flex items-center gap-2">
+          <span className={`font-mono text-fg ${MARK_STYLES.required}`}>
+            WORD
+          </span>
+          REQUIRED
         </span>
         <span className="flex items-center gap-2">
           <span className={`font-mono text-fg ${MARK_STYLES.locked}`}>
