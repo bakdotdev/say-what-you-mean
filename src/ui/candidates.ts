@@ -11,7 +11,7 @@
  * content-bearing options of a similar shape.
  */
 import { wordParity, type deriveKeys } from "../codec"
-import { COMMON_WORD_COUNT } from "./useWordlist"
+import { commonWordCount } from "./useWordlist"
 
 /**
  * The wordlist is the Google 10k common-English list first, then the long tail
@@ -28,7 +28,7 @@ const FUNCTION_WORD_RANK = 300
  * words beginning with "a" — "appaume", "aythya", "aliturgic". Suggestions
  * looked like they were all from one letter because they were.
  */
-const COMMON_WORD_LIMIT = COMMON_WORD_COUNT
+
 
 export const OPTIONS_PER_SLOT = 24
 
@@ -79,7 +79,7 @@ export const candidatesFor = async (
   // same letter. A stride coprime to the span still visits every position,
   // but spreads the samples across the whole band.
   const lo = isFunctionWord ? 0 : FUNCTION_WORD_RANK
-  const hi = Math.min(vocabulary.length, COMMON_WORD_LIMIT)
+  const hi = Math.min(vocabulary.length, commonWordCount(vocabulary))
   const span = hi - lo
   if (span <= 0) return []
   const start = lo + Math.floor(Math.random() * span)

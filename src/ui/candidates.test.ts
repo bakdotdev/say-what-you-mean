@@ -3,19 +3,28 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { deriveKeys, wordParity } from "../codec"
 import { candidatesFor } from "./candidates"
-import { COMMON_WORD_COUNT } from "./useWordlist"
+import { commonWordCount } from "./useWordlist"
 
 const vocab = readFileSync(resolve(process.cwd(), "public/wordlist.txt"), "utf8")
   .split("\n")
   .map((w) => w.trim())
   .filter(Boolean)
 
-const BANNED = ["dildo", "porn", "pichunter", "tgp", "xxx", "viagra"]
+/**
+ * The whole vendored blocklist, not a handful of samples. These words reached
+ * users' messages as replacement suggestions, and enough of them in one
+ * request made the model provider refuse it outright (finish_reason
+ * "content-filter"). scripts/clean-wordlist.mjs strips them.
+ */
+const BANNED = readFileSync(resolve(process.cwd(), "data/blocked-words.txt"), "utf8")
+  .split("\n")
+  .map((w) => w.trim())
+  .filter(Boolean)
 
 describe("candidates", () => {
   it("wordlist contains no blocked terms", () => {
-    const present = BANNED.filter((w) => vocab.includes(w))
-    expect(present).toEqual([])
+    const set = new Set(vocab)
+    expect(BANNED.filter((w) => set.has(w))).toEqual([])
   })
 
   it("offers common content words, not function words or archaic junk", async () => {
@@ -25,10 +34,8 @@ describe("candidates", () => {
     // none may be a top-300 function word
     for (const o of options) {
       expect(vocab.indexOf(o)).toBeGreaterThanOrEqual(300)
-      // nor from the archaic tail. 30k is the deliberate bound: function
-      // words can never carry and only half the rest does, so the pool needs
-      // to reach past the Google 10k to stay rich.
-      expect(vocab.indexOf(o)).toBeLessThan(30000)
+      // nor from the alphabetical dictionary past the boundary
+      expect(vocab.indexOf(o)).toBeLessThan(commonWordCount(vocab))
       expect(o.length).toBeGreaterThanOrEqual(4)
     }
   }, 60_000)
@@ -85,6 +92,7 @@ describe("wordlist shape", () => {
    * drawing archaic dictionary words again.
    */
   it("is frequency-ordered up to the boundary and alphabetical after", () => {
+    const COMMON_WORD_COUNT = commonWordCount(vocab)
     // The failure mode is not ordering as such — the dictionary is sorted by
     // some non-ASCII collation ("abay" after "abaft") — it is that one letter
     // takes over, so a band reaching past the boundary offers only "a" words.

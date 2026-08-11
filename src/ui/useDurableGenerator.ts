@@ -32,7 +32,7 @@ import {
   type Encoder,
 } from "../codec"
 import { isCarrierWord } from "../codec/equations"
-import { COMMON_WORD_COUNT } from "./useWordlist"
+import { commonWordCount } from "./useWordlist"
 
 export interface DurableGenState {
   busy: boolean
@@ -47,12 +47,7 @@ export interface DurableGenState {
 const RUN_WORDS = 700
 /** Extra passes when the first piece lands short of a decode. */
 const MAX_RUNS = 4
-/**
- * Vocabulary band scanned for fitting replacements. Must not pass
- * COMMON_WORD_COUNT — beyond it the list is an alphabetical dictionary, and
- * drawing from there is what produced "korea", "arab", "edward" and "blog".
- */
-const COMMON_BAND = COMMON_WORD_COUNT
+
 const REPLACEMENT_POOL = 6000
 const OPTIONS_PER_SLOT = 32
 /**
@@ -104,7 +99,10 @@ export function useDurableGenerator() {
         // replacement pool is knowable before any text exists.
         const pool = await encoder.suggestFrom(
           "",
-          vocabulary.slice(0, COMMON_BAND),
+          // Stop at the boundary: past it the list is an alphabetical
+          // dictionary, and drawing from there produced "korea", "arab",
+          // "edward" and "blog".
+          vocabulary.slice(0, commonWordCount(vocabulary)),
           REPLACEMENT_POOL,
           0,
         )
