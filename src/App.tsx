@@ -14,7 +14,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>("hide")
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+    <main className="mx-auto max-w-2xl px-4 py-8 uppercase sm:py-12">
       <header className="mb-4 border-b border-edge pb-3">
         <div className="flex items-baseline justify-between gap-3">
           <h1 className="text-sm uppercase tracking-[0.25em] text-fg">
@@ -43,7 +43,7 @@ export function App() {
               "flex flex-1 items-center justify-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors " +
               (i > 0 ? "border-l border-edge " : "") +
               (tab === t.id
-                ? "bg-accent/10 text-accent"
+                ? "bg-accent/15 text-fg"
                 : "bg-panel text-muted hover:text-fg-dim")
             }
           >

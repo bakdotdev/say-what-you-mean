@@ -8,12 +8,15 @@
   --color-edge: #2e2820;
 
   /* Amber phosphor palette */
+  /* Single amber hue. Hierarchy comes from opacity + size only. */
   --color-fg: #ffb62e;
-  --color-fg-dim: #c98a1f;
-  --color-muted: #8a6a2c;
+  --color-fg-dim: rgb(255 182 46 / 0.72);
+  --color-muted: rgb(255 182 46 / 0.42);
+  --color-faint: rgb(255 182 46 / 0.18);
   --color-accent: #ffb62e;
-  --color-green: #7ddc5a;
-  --color-red: #ff5f4d;
+  /* Semantic names kept so components need no rewrite — all the same amber. */
+  --color-green: #ffb62e;
+  --color-red: #ffb62e;
 
   --font-sans: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo,
     monospace;

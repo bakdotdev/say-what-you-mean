@@ -96,7 +96,7 @@ export function HideView() {
               className={
                 "border px-1.5 py-0.5 text-[10px] tracking-wider " +
                 (i < density
-                  ? "border-accent/50 bg-accent/10 text-accent"
+                  ? "border-fg/60 bg-accent/15 text-fg"
                   : "border-edge text-muted/50")
               }
             >
@@ -150,6 +150,7 @@ export function HideView() {
             setCopied(false)
           }}
           rows={6}
+          className="normal-case"
           placeholder={
             ready
               ? "Write ordinary sentences. Keep the words that light up; replace the ones that don't."
@@ -161,7 +162,7 @@ export function HideView() {
       </Panel>
 
       {error && (
-        <p className="border border-red/40 bg-red/10 px-3 py-2 text-xs text-red">
+        <p className="border border-fg/50 bg-accent/10 px-3 py-2 text-xs text-fg">
           {error}
         </p>
       )}
@@ -187,10 +188,10 @@ export function HideView() {
                     title={`${w.satisfied}/${w.total} methods fit`}
                     onClick={() => setInspecting(i)}
                     className={
-                      "border px-1.5 py-0.5 text-xs transition-colors " +
+                      "border px-1.5 py-0.5 text-xs normal-case text-fg transition-opacity " +
                       (w.green
-                        ? "border-green/40 bg-green/10 text-green hover:bg-green/20"
-                        : "border-red/40 bg-red/10 text-red hover:bg-red/20")
+                        ? "border-fg/50 bg-accent/15 opacity-100"
+                        : "border-fg/20 bg-transparent opacity-20 hover:opacity-50")
                     }
                   >
                     {w.word}
@@ -216,7 +217,7 @@ export function HideView() {
                   <button
                     key={w}
                     onClick={() => appendWord(w)}
-                    className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs text-fg-dim hover:border-accent hover:text-accent"
+                    className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs normal-case text-fg-dim hover:border-accent hover:text-fg"
                   >
                     {w}
                   </button>
@@ -287,7 +288,7 @@ function StatusPanel({
         </div>
         <div>
           <dt className="text-muted">deletions survived</dt>
-          <dd className={solved ? "text-green" : "text-muted"}>
+          <dd className={solved ? "text-fg" : "text-muted"}>
             {solved ? `~${survivable}` : "—"}
           </dd>
         </div>

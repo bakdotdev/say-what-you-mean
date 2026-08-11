@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { decode, type DecodeResult } from "../codec"
 import { Field, Panel, Tag, TextArea, TextInput } from "./primitives"
-import { DecryptReveal } from "../components/canvasui/DecryptReveal"
+import { RevealOutput } from "./RevealOutput"
 
 export function RevealView() {
   const [carrier, setCarrier] = useState("")
@@ -38,6 +38,7 @@ export function RevealView() {
           value={carrier}
           onChange={(e) => setCarrier(e.target.value)}
           rows={6}
+          className="normal-case"
           placeholder="Paste the text you received."
           aria-label="Received carrier text"
         />
@@ -67,21 +68,9 @@ export function RevealView() {
           }
         >
           {found ? (
-            <DecryptReveal
-              key={result.secret}
-              color="#ffb62e"
-              radius={260}
-              cell={11}
-              passthrough={0.12}
-              edgeFlicker={1}
-              className="block"
-            >
-              <p className="break-all border border-green/40 bg-green/10 px-3 py-3 text-base tracking-widest text-green">
-                {result.secret}
-              </p>
-            </DecryptReveal>
+            <RevealOutput secret={result.secret!} />
           ) : (
-            <p className="border border-red/40 bg-red/10 px-3 py-2 text-xs leading-relaxed text-red">
+            <p className="border border-faint px-3 py-2 text-xs leading-relaxed text-muted">
               wrong passphrase, or the text was damaged beyond recovery.
             </p>
           )}

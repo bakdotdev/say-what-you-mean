@@ -84,7 +84,7 @@ export function Meter({
 }) {
   const pct = max <= 0 ? 0 : Math.min(1, value / max)
   const filled = Math.round(pct * segments)
-  const color = tone === "green" ? "bg-green" : "bg-accent"
+  const color = tone === "green" ? "bg-accent" : "bg-accent/70"
   return (
     <div
       className="flex gap-[2px]"
@@ -98,7 +98,7 @@ export function Meter({
           key={i}
           className={cx(
             "h-2.5 flex-1 transition-colors",
-            i < filled ? color : "bg-edge/60",
+            i < filled ? color : "bg-faint/40",
           )}
         />
       ))}
@@ -117,8 +117,9 @@ export function Tag({
     <span
       className={cx(
         "inline-flex items-center border px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
-        tone === "green" && "border-green/40 bg-green/10 text-green",
-        tone === "red" && "border-red/40 bg-red/10 text-red",
+        // One hue; state reads through opacity and fill weight.
+        tone === "green" && "border-fg bg-accent/20 text-fg",
+        tone === "red" && "border-faint bg-transparent text-muted",
         tone === "muted" && "border-edge bg-panel-2 text-muted",
       )}
     >
