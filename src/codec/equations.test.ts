@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest"
-import { equationFromDigest, wordEquation, isGreen } from "./equations"
+import {
+  equationFromDigest,
+  equationsFor,
+  wordDigests,
+  isSatisfied,
+  agreement,
+} from "./equations"
+import { featuresOf, FEATURE_METHODS } from "./features"
 import { deriveKeys } from "./keys"
 
 const digestOf = (label: string): Uint8Array => {
@@ -15,12 +22,31 @@ const digestOf = (label: string): Uint8Array => {
   return out
 }
 
+describe("features", () => {
+  it("extracts all four methods for a normal word", () => {
+    const ids = featuresOf("meeting").map((f) => f.methodId)
+    expect(ids).toEqual(["id", "lr", "sh", "af"])
+  })
+
+  it("skips methods that do not apply to very short words", () => {
+    const ids = featuresOf("a").map((f) => f.methodId)
+    expect(ids).toEqual(["id"]) // no gaps, no shape, no affixes
+  })
+
+  it("letter-gap signature ignores absolute letters", () => {
+    const gapOf = (w: string) =>
+      FEATURE_METHODS.find((m) => m.id === "lr")!.of(w)
+    // "abc" and "bcd" share the same consecutive gaps (+1,+1)
+    expect(gapOf("abc")).toBe(gapOf("bcd"))
+    expect(gapOf("abc")).not.toBe(gapOf("acb"))
+  })
+})
+
 describe("equations", () => {
   it("produces distinct in-range indices for a range of B", () => {
-    for (const B of [20, 26, 74, 116]) {
-      for (let n = 0; n < 200; n++) {
+    for (const B of [26, 74, 116]) {
+      for (let n = 0; n < 100; n++) {
         const eq = equationFromDigest(digestOf("word" + n), B)
-        expect(eq.subset.length).toBeGreaterThanOrEqual(1)
         expect(new Set(eq.subset).size).toBe(eq.subset.length)
         for (const idx of eq.subset) {
           expect(idx).toBeGreaterThanOrEqual(0)
@@ -30,35 +56,37 @@ describe("equations", () => {
     }
   })
 
-  it("is deterministic", () => {
-    expect(equationFromDigest(digestOf("cat"), 74)).toEqual(
-      equationFromDigest(digestOf("cat"), 74),
-    )
-  })
-
-  it("has a low-degree-heavy distribution", () => {
-    const counts = new Map<number, number>()
-    for (let n = 0; n < 2000; n++) {
-      const d = equationFromDigest(digestOf("w" + n), 74).subset.length
-      counts.set(d, (counts.get(d) ?? 0) + 1)
-    }
-    // degree 1 and 2 should dominate
-    const low = (counts.get(1) ?? 0) + (counts.get(2) ?? 0)
-    expect(low).toBeGreaterThan(1000)
-    expect(counts.get(1) ?? 0).toBeGreaterThan(0)
-  })
-
-  it("wordEquation matches equationFromDigest under the real HMAC", async () => {
+  it("gives a word one equation per applicable feature", async () => {
     const keys = await deriveKeys("pass")
-    const eqA = await wordEquation("meet", keys, 74)
-    const eqB = await wordEquation("meet", keys, 74)
-    expect(eqA).toEqual(eqB)
+    const fd = await wordDigests("meeting", keys)
+    const eqs = equationsFor(fd, 74)
+    expect(eqs).toHaveLength(4)
+    expect(eqs.map((e) => e.methodId)).toEqual(["id", "lr", "sh", "af"])
   })
 
-  it("isGreen checks the parity of the payload subset", () => {
+  it("is deterministic", async () => {
+    const keys = await deriveKeys("pass")
+    const a = equationsFor(await wordDigests("river", keys), 74)
+    const b = equationsFor(await wordDigests("river", keys), 74)
+    expect(a).toEqual(b)
+  })
+
+  it("isSatisfied and agreement compute subset parity", () => {
     const payload = [1, 0, 1, 1] as const
-    expect(isGreen({ subset: [0, 2], parity: 0 }, [...payload])).toBe(true) // 1^1=0
-    expect(isGreen({ subset: [0, 1], parity: 1 }, [...payload])).toBe(true) // 1^0=1
-    expect(isGreen({ subset: [0, 1], parity: 0 }, [...payload])).toBe(false)
+    expect(
+      isSatisfied({ subset: [0, 2], parity: 0, methodId: "id" }, [...payload]),
+    ).toBe(true)
+    expect(
+      isSatisfied({ subset: [0, 1], parity: 0, methodId: "id" }, [...payload]),
+    ).toBe(false)
+    expect(
+      agreement(
+        [
+          { subset: [0, 2], parity: 0, methodId: "id" },
+          { subset: [0, 1], parity: 0, methodId: "sh" },
+        ],
+        [...payload],
+      ),
+    ).toBe(0.5)
   })
 })

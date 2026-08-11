@@ -1,30 +1,36 @@
 /**
- * Turns each carrier word into one linear equation over the payload bits.
+ * Turns each carrier word into SEVERAL linear equations over the payload bits
+ * — one per applicable feature method (see features.ts).
  *
- *   h = HMAC(k_addr, word)                       (32 pseudo-random bytes)
- *   degree d   <- Soliton-ish distribution from h
- *   subset     <- d distinct payload-bit indices drawn from h
- *   parity     <- one bit from h
- *   equation:  XOR(payload[i] for i in subset) == parity
+ *   for each feature f of word w:
+ *     h = HMAC(k_addr, f)                       (32 pseudo-random bytes)
+ *     degree d   <- Soliton-ish distribution from h
+ *     subset     <- d distinct payload-bit indices drawn from h
+ *     parity     <- one bit from h
+ *     equation:  XOR(payload[i] for i in subset) == parity
  *
- * Because the equation depends ONLY on the word (not its neighbours),
- * deleting or duplicating a word is a clean erasure — it never manufactures
- * a false equation. That is what makes the scheme deletion-robust.
+ * Each equation is a CONSTRAINT the writer satisfies by choosing words — not
+ * an opinion to be averaged. (A fixed per-word "vote" carries no information,
+ * because its value isn't selectable; see the design spec.)
+ *
+ * Because a feature depends only on its own word, deleting or reordering
+ * words is a clean erasure: it removes that word's equations and manufactures
+ * no false ones elsewhere.
  */
 import type { Bit } from "./bytes"
 import { hmac, type Keys } from "./keys"
 import { textToBytes } from "./bytes"
+import { featuresOf, FEATURE_METHODS, MAX_DENSITY } from "./features"
 
 export interface Equation {
   /** Distinct payload-bit indices, ascending. */
   subset: number[]
   parity: Bit
+  /** Which feature method produced this equation. */
+  methodId: string
 }
 
-/**
- * Degree distribution (low-degree heavy so the peeling decoder makes
- * progress). Tuned against scratchpad/codec-sim.mjs.
- */
+/** Degree distribution (low-degree heavy so the peeling decoder progresses). */
 const degreeFromByte = (byte: number, B: number): number => {
   const r = byte / 256
   let d: number
@@ -36,7 +42,7 @@ const degreeFromByte = (byte: number, B: number): number => {
   return Math.min(d, B)
 }
 
-/** Small deterministic PRNG (mulberry32) seeded from four bytes. */
+/** Small deterministic PRNG (mulberry32) seeded from four digest bytes. */
 const seededRng = (seed: number): (() => number) => {
   let a = seed >>> 0
   return () => {
@@ -48,43 +54,72 @@ const seededRng = (seed: number): (() => number) => {
   }
 }
 
-/** Derive the equation for a word given its HMAC digest. */
-export const equationFromDigest = (digest: Uint8Array, B: number): Equation => {
+/** Derive one equation from a feature digest. */
+export const equationFromDigest = (
+  digest: Uint8Array,
+  B: number,
+  methodId = "id",
+): Equation => {
   const degree = degreeFromByte(digest[0], B)
-  // Seed an unbounded index stream from the digest so we can always collect
-  // `degree` distinct indices (degree <= B guarantees termination).
   const seed =
     (digest[1] << 24) | (digest[2] << 16) | (digest[3] << 8) | digest[4]
   const rng = seededRng(seed)
   const subset = new Set<number>()
-  while (subset.size < degree) {
-    subset.add(Math.floor(rng() * B))
+  while (subset.size < degree) subset.add(Math.floor(rng() * B))
+  return {
+    subset: [...subset].sort((a, b) => a - b),
+    parity: (digest[digest.length - 1] & 1) as Bit,
+    methodId,
   }
-  const parity = (digest[digest.length - 1] & 1) as Bit
-  return { subset: [...subset].sort((a, b) => a - b), parity }
 }
 
-/** The keyed 32-byte digest for a word — independent of B, so it can be
- * computed once and reused across every candidate payload length. */
-export const wordDigest = (word: string, keys: Keys): Promise<Uint8Array> =>
-  hmac(keys.addr, textToBytes(word))
+/** Digests for every applicable feature of a word (independent of B). */
+export interface WordFeatureDigests {
+  word: string
+  features: { methodId: string; digest: Uint8Array }[]
+}
 
-/** Compute a single word's equation (async: uses HMAC). */
-export const wordEquation = async (
+export const wordDigests = async (
   word: string,
   keys: Keys,
-  B: number,
-): Promise<Equation> => {
-  const digest = await wordDigest(word, keys)
-  return equationFromDigest(digest, B)
+): Promise<WordFeatureDigests> => {
+  // Always compute every method's digest; `density` selects how many are used.
+  const features = await Promise.all(
+    featuresOf(word, MAX_DENSITY).map(async ({ methodId, feature }) => ({
+      methodId,
+      digest: await hmac(keys.addr, textToBytes(feature)),
+    })),
+  )
+  return { word, features }
 }
 
 /**
- * Whether `word` would light green for `payload` — i.e. its equation is
- * satisfied by the true payload bits.
+ * Equations a word asserts at payload size B, using the first `density`
+ * feature methods (in FEATURE_METHODS order).
  */
-export const isGreen = (equation: Equation, payload: Bit[]): boolean => {
+export const equationsFor = (
+  fd: WordFeatureDigests,
+  B: number,
+  density: number = MAX_DENSITY,
+): Equation[] => {
+  const active = new Set(
+    FEATURE_METHODS.slice(0, density).map((m) => m.id),
+  )
+  return fd.features
+    .filter(({ methodId }) => active.has(methodId))
+    .map(({ methodId, digest }) => equationFromDigest(digest, B, methodId))
+}
+
+/** Whether an equation is satisfied by the true payload. */
+export const isSatisfied = (equation: Equation, payload: Bit[]): boolean => {
   let p = 0
   for (const idx of equation.subset) p ^= payload[idx]
   return p === equation.parity
+}
+
+/** Fraction of a word's equations satisfied by the payload (0..1). */
+export const agreement = (equations: Equation[], payload: Bit[]): number => {
+  if (equations.length === 0) return 0
+  const ok = equations.filter((e) => isSatisfied(e, payload)).length
+  return ok / equations.length
 }

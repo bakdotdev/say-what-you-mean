@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { normalizeSecret, MAX_SECRET_LENGTH } from "../codec"
+import { normalizeSecret, MAX_SECRET_LENGTH, DENSITY_PRESETS } from "../codec"
 import { useEncoder } from "./useEncoder"
 import { useWordDigests } from "./useWordlist"
 import {
@@ -18,8 +18,14 @@ export function HideView() {
   const [carrier, setCarrier] = useState("")
   const [inspecting, setInspecting] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
+  const [density, setDensity] = useState<number>(DENSITY_PRESETS.balanced)
 
-  const { encoder, state, error } = useEncoder(secret, passphrase, carrier)
+  const { encoder, state, error } = useEncoder(
+    secret,
+    passphrase,
+    carrier,
+    density,
+  )
   const digests = useWordDigests(encoder)
 
   const suggestions = useMemo(() => {
@@ -68,6 +74,8 @@ export function HideView() {
         </Field>
       </div>
 
+      <DensityControl value={density} onChange={setDensity} />
+
       <Field
         label="Write your carrier text"
         hint="keep every word green"
@@ -100,28 +108,28 @@ export function HideView() {
           {state.tokens.length > 0 && (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1.5">
-                {state.tokens.map((token, i) => (
+                {state.words.map((w, i) => (
                   <button
                     key={i}
-                    data-flag={state.wordFlags[i] ? "green" : "red"}
+                    data-flag={w.green ? "green" : "red"}
+                    title={`${w.satisfied}/${w.total} methods fit`}
                     onClick={() => setInspecting(i)}
                     className={
                       "rounded px-1.5 py-0.5 font-mono text-xs transition-colors " +
-                      (state.wordFlags[i]
+                      (w.green
                         ? "bg-green/15 text-green hover:bg-green/25"
                         : "bg-red/20 text-red hover:bg-red/30")
                     }
                   >
-                    {token}
+                    {w.word}
                   </button>
                 ))}
               </div>
               {inspecting !== null &&
                 encoder &&
-                state.tokens[inspecting] !== undefined && (
+                state.words[inspecting] !== undefined && (
                   <WordInspector
-                    word={state.tokens[inspecting]}
-                    green={state.wordFlags[inspecting]}
+                    report={state.words[inspecting]}
                     encoder={encoder}
                     onClose={() => setInspecting(null)}
                   />
@@ -205,6 +213,49 @@ function StatusPanel({
             ? "Red words contradict the message. Replace them with green ones."
             : "Write more green words until every payload bit is covered."}
       </p>
+    </div>
+  )
+}
+
+const DENSITY_LABELS: Record<number, { name: string; blurb: string }> = {
+  1: { name: "Freest", blurb: "most words fit — longest carrier" },
+  2: { name: "Balanced", blurb: "a good mix of freedom and length" },
+  3: { name: "Compact", blurb: "fewer words fit — shorter carrier" },
+  4: { name: "Tightest", blurb: "hardest to write — shortest carrier" },
+}
+
+function DensityControl({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (v: number) => void
+}) {
+  const info = DENSITY_LABELS[value]
+  return (
+    <div className="rounded-lg border border-edge bg-panel p-4">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-sm font-medium">
+          Writing freedom vs. length
+        </span>
+        <span className="text-xs text-muted">
+          {info.name} — {info.blurb}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={1}
+        max={4}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="Writing freedom vs carrier length"
+        className="w-full accent-accent"
+      />
+      <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wide text-muted">
+        <span>write freely</span>
+        <span>shorter text</span>
+      </div>
     </div>
   )
 }

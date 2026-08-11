@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { solve } from "./solver"
-import { equationFromDigest, isGreen, type Equation } from "./equations"
+import { equationFromDigest, isSatisfied, type Equation } from "./equations"
 import type { Bit } from "./bytes"
 
 // Build a deterministic pseudo-random digest for a label.
@@ -24,7 +24,7 @@ const greenEquationsFor = (payload: Bit[], count: number): Equation[] => {
   let n = 0
   while (eqs.length < count && n < count * 40) {
     const eq = equationFromDigest(fakeDigest("w" + n++), B)
-    if (isGreen(eq, payload)) eqs.push(eq)
+    if (isSatisfied(eq, payload)) eqs.push(eq)
   }
   return eqs
 }
@@ -56,9 +56,9 @@ describe("solver", () => {
     // x0^x1 = 1  -> x1 = 0
     // x1^x2 = 1  -> x2 = 1
     const eqs: Equation[] = [
-      { subset: [0], parity: 1 },
-      { subset: [0, 1], parity: 1 },
-      { subset: [1, 2], parity: 1 },
+      { subset: [0], parity: 1, methodId: "id" },
+      { subset: [0, 1], parity: 1, methodId: "id" },
+      { subset: [1, 2], parity: 1, methodId: "id" },
     ]
     const { bits } = solve(eqs, 3)
     expect(bits).toEqual([1, 0, 1])

@@ -5,6 +5,9 @@ import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
   base: "/say-what-you-mean/",
+  // Emit files physically under the base path so asset URLs and file paths
+  // agree when Vercel serves `dist` at the domain root.
+  build: { outDir: "dist/say-what-you-mean", emptyOutDir: true },
   plugins: [react(), tailwindcss()],
   test: {
     environment: "jsdom",

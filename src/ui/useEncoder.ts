@@ -4,7 +4,12 @@
  * Serializes async work so stale results never overwrite fresh ones.
  */
 import { useEffect, useRef, useState } from "react"
-import { createEncoder, type EncodeState, type Encoder } from "../codec"
+import {
+  createEncoder,
+  DENSITY_PRESETS,
+  type EncodeState,
+  type Encoder,
+} from "../codec"
 
 export interface EncoderStatus {
   state: EncodeState | null
@@ -19,6 +24,7 @@ export function useEncoder(
   secret: string,
   passphrase: string,
   carrier: string,
+  density: number = DENSITY_PRESETS.balanced,
 ): EncoderStatus {
   const [encoder, setEncoder] = useState<Encoder | null>(null)
   const [state, setState] = useState<EncodeState | null>(null)
@@ -34,7 +40,7 @@ export function useEncoder(
       setEncoder(null)
       return
     }
-    createEncoder(secret, passphrase)
+    createEncoder(secret, passphrase, density)
       .then((e) => {
         if (!cancelled) setEncoder(e)
       })
@@ -45,7 +51,7 @@ export function useEncoder(
     return () => {
       cancelled = true
     }
-  }, [secret, passphrase])
+  }, [secret, passphrase, density])
 
   // Evaluate the carrier, debounced, whenever it or the encoder changes.
   useEffect(() => {
