@@ -91,44 +91,48 @@ besides the carrier text, so there is nowhere to put a per-message salt.
 Mitigated by iteration count and the app-specific constant. All via Web
 Crypto; constants frozen as protocol v1.
 
-### 3.4 The carrier channel: keyed word-bigram equations
+### 3.4 The carrier channel: keyed single-word equations
 
-Tokenize the carrier (§3.6). Each consecutive word pair emits one equation
-about the payload bits:
+Tokenize the carrier (§3.6). Each word emits one equation about the payload
+bits:
 
 ```
-h = HMAC(k_addr, prev_word | word)
+h = HMAC(k_addr, word)
 equation: XOR of payload bits in subset(h)  ==  parity(h)
 ```
 
 - `subset(h)`: a sparse, h-seeded subset of the B payload bit indices
-  (LT/fountain-style, low degree 1–3; exact degree distribution tuned in
-  implementation via the simulation harness).
+  (LT/fountain-style, low degree, Soliton-ish distribution tuned via the
+  simulation harness).
 - `parity(h)`: one bit derived from h.
-- The first word pairs with a fixed sentinel `^`.
 
-Every bigram in the text asserts one equation. **Roughly half of all
-candidate next-words yield a true equation** — the author's job, guided by
-live feedback, is to only keep words that light green. Repeated words get
-fresh 50/50 odds at each position because the address includes the preceding
-word (no globally "banned" common words).
+Every word asserts one equation. **Roughly half of all candidate words yield
+a true equation** — the author's job, guided by live feedback, is to keep
+only words that light green.
 
-This is the character-relationship cipher, systematized: the hash digests
-every letter of the word pair, so any change to the relationship changes the
-equation; and each equation identifies *which* payload bits it speaks about
-by content, never by position.
+**Why single-word (not bigram) addressing:** each equation depends only on
+its own word, never on neighbors. So deleting or altering a word is a *clean
+erasure* — it removes that one equation and creates no false "bridge"
+equation elsewhere. A simulation (`scratchpad/codec-sim.mjs`, 40 trials/row)
+confirmed this decodes 40/40 and survives 39–74 deletions with redundancy,
+whereas a position/bigram scheme injects errors on every deletion. The hash
+still digests every character of the word and its arrangement (`cat` ≠ `act`
+≠ `cats`), so this remains the character-relationship cipher — scoped to each
+word, which is exactly what buys the robustness. Repeated identical words
+produce identical (redundant) equations, so the UI nudges toward varied
+words; duplicates never harm, they just don't add new information.
 
 ### 3.5 Decoding
 
-1. Tokenize; compute every bigram's equation.
-2. Deduplicate identical equations; resolve conflicts by vote count
-   (false equations arise only from deletion-bridged bigrams and are rare).
-3. Solve the GF(2) linear system (B ≤ 116 — Gaussian elimination is
-   trivial). If a small number of bits are undetermined (≤ ~8 erasures),
-   try all completions and let the MAC arbitrate.
+1. Tokenize; compute every word's equation.
+2. Deduplicate identical equations.
+3. Solve by **peeling** (belief propagation): repeatedly apply degree-1
+   equations, substituting solved bits back. If peeling stalls with bits
+   still coupled, finish with Gaussian elimination on the residual system
+   (B ≤ 116 — trivial). Undetermined bits remain null (erasures).
 4. For N = 1..16: derive keystream, decrypt, verify MAC. On success, show
-   the secret plus diagnostics (equations used, erasures healed, conflicts
-   dropped). Otherwise: explicit failure ("wrong passphrase or too damaged").
+   the secret plus diagnostics (words seen, equations used, bits recovered).
+   Otherwise: explicit failure ("wrong passphrase or too damaged").
 
 ### 3.6 Tokenization (protocol-critical)
 
@@ -157,17 +161,20 @@ by content, never by position.
 
 ### 3.8 Capacity / effort (honest numbers)
 
-~1 bit per word before redundancy; solvability needs ~1.1–1.3× B equations.
+Measured via `scratchpad/codec-sim.mjs` (LT peeling, ~25% word reuse, 40
+trials). Real numbers, not idealized:
 
-| Secret length | Payload bits | Carrier (minimum) | Carrier (comfortable durability) |
+| Secret length | Payload bits | Carrier to solve (avg / range) | Deletions survived at +60% redundancy |
 |---|---|---|---|
-| 4 chars  | 44  | ~55 words  | ~90 words |
-| 8 chars  | 68  | ~85 words  | ~140 words |
-| 16 chars | 116 | ~145 words | ~230 words |
+| 9 chars  | 74  | ~173 words (120–240) | ~39 |
+| 16 chars | 116 | ~314 words (190–540) | ~74 |
 
-Rule of thumb surfaced in the UI: **~10–15 words of carrier per secret
-character.** These estimates are validated and refined by the simulation
-harness during implementation.
+Honest takeaway surfaced in the UI: roughly **15–20 words of carrier per
+secret character**, so a short secret is ~2–3 paragraphs and a full 16-char
+secret is a long page. The live meter means the writer always knows exactly
+where they stand; no fixed number is promised up front. Guidance toward
+fresh (unseen) green words via the stuck-helper raises the effective unique
+fraction and lowers these counts in practice.
 
 ## 4. Application
 
