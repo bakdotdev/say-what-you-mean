@@ -11,7 +11,11 @@ import {
   Tag,
   TextInput,
 } from "./primitives"
-import { HighlightedTextArea, type Mark } from "./HighlightedTextArea"
+import {
+  HighlightedTextArea,
+  MARK_STYLES,
+  type Mark,
+} from "./HighlightedTextArea"
 import { Columns } from "./Columns"
 import { About } from "./About"
 import { SwapPicker } from "./SwapPicker"
@@ -247,9 +251,27 @@ export function HideView() {
         onWordClick={toggleLock}
       />
       </div>
-      <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-        // click any word to lock it · shaded = being changed · solid = locked
-      </p>
+      {/* Swatches use MARK_STYLES, the same source as the text, so the
+          legend cannot drift out of sync with what is rendered. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] tracking-wider text-muted">
+        <span className="flex items-center gap-1.5">
+          <span
+            className={`rounded-[2px] font-mono normal-case text-fg ${MARK_STYLES.carrier}`}
+          >
+            word
+          </span>
+          being changed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className={`rounded-[2px] font-mono normal-case text-fg ${MARK_STYLES.locked}`}
+          >
+            word
+          </span>
+          locked by you
+        </span>
+        <span>// click any word to lock it</span>
+      </div>
       <Button
         variant={embedded ? "ready" : "ghost"}
         onClick={copy}

@@ -33,6 +33,21 @@ export interface Mark {
 const SHARED =
   "px-2.5 py-1.5 font-mono text-[13px] leading-relaxed tracking-normal whitespace-pre-wrap break-words"
 
+/**
+ * The only visual language for word state: background opacity. No borders or
+ * outlines anywhere — the box-shadow is a spread of the SAME colour, which
+ * widens the fill past the glyph edges without taking layout space, so it
+ * reads as background rather than an edge.
+ *
+ * Exported so the legend can render swatches with these exact classes and stay
+ * 1:1 with the text by construction, not by someone remembering to update it.
+ */
+export const MARK_STYLES: Record<Mark["kind"], string> = {
+  locked: "bg-accent/45 shadow-[0_0_0_2px] shadow-accent/45",
+  carrier: "bg-accent/15 shadow-[0_0_0_2px] shadow-accent/15",
+  plain: "",
+}
+
 export function HighlightedTextArea({
   value,
   onChange,
@@ -108,16 +123,7 @@ function renderMarked(
     if (m.start < cursor) return
     if (m.start > cursor) out.push(text.slice(cursor, m.start))
 
-    // Backgrounds only. The box-shadow here is a spread of the SAME colour —
-    // it widens the fill past the glyph edges without taking layout space, so
-    // it reads as a background, not a border. Locked words get the one real
-    // outline, since that state is a deliberate act worth calling out.
-    const fill =
-      m.kind === "locked"
-        ? "bg-accent/35 shadow-[0_0_0_2px] shadow-accent/35 outline outline-1 outline-accent"
-        : m.kind === "carrier"
-          ? "bg-accent/12 shadow-[0_0_0_2px] shadow-accent/12"
-          : ""
+    const fill = MARK_STYLES[m.kind]
 
     const clickable = onWordClick && m.slot !== undefined
 
