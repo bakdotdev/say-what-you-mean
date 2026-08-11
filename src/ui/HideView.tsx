@@ -303,14 +303,6 @@ export function HideView({
         }}
       />
       </div>
-      <Button
-        variant={embedded ? "ready" : "ghost"}
-        onClick={copy}
-        disabled={!embedded}
-        className="mt-2 w-full"
-      >
-        {copied ? "copied ✓" : "copy carrier"}
-      </Button>
 
       {/* Swatches use MARK_STYLES, the same source as the text, so the
           legend cannot drift out of sync with what is rendered. */}
@@ -339,6 +331,14 @@ export function HideView({
         </span>
         <span>CLICK A WORD FOR OPTIONS</span>
       </div>
+      <Button
+        variant={embedded ? "ready" : "ghost"}
+        onClick={copy}
+        disabled={!embedded}
+        className="mt-3 w-full"
+      >
+        {copied ? "copied ✓" : "copy carrier message"}
+      </Button>
     </Panel>
   )
 
