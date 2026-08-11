@@ -295,6 +295,15 @@ export function HideView({
         }
         disabled={!ready}
         ariaLabel="Carrier text"
+        busyLabel={
+          generator.busy || durableGen.busy
+            ? generator.stage || durableGen.stage || "working…"
+            : ai.busy
+              ? "choosing words…"
+              : applying
+                ? "applying…"
+                : null
+        }
         onWordClick={(slot) => {
           // A word that needs changing wants replacements; anything else is
           // a lock toggle.
@@ -397,7 +406,7 @@ export function HideView({
           className="w-full"
         >
           {generator.busy || durableGen.busy
-            ? generator.stage || durableGen.stage || "generating…"
+            ? "working…"
             : "generate a carrier for me"}
         </Button>
         {(generator.error || durableGen.error) && (

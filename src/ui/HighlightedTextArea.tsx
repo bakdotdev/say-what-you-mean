@@ -68,6 +68,7 @@ export function HighlightedTextArea({
   disabled,
   ariaLabel,
   onWordClick,
+  busyLabel,
 }: {
   value: string
   onChange: (next: string) => void
@@ -78,6 +79,12 @@ export function HighlightedTextArea({
   ariaLabel?: string
   /** Receives the mark's `slot` when a shaded word is clicked. */
   onWordClick?: (slot: number) => void
+  /**
+   * When set, covers the field with a centred progress line. Generation takes
+   * tens of seconds across several runs, so the status belongs where the user
+   * is looking rather than in a distant panel.
+   */
+  busyLabel?: string | null
 }) {
   const taRef = useRef<HTMLTextAreaElement | null>(null)
   const backRef = useRef<HTMLDivElement | null>(null)
@@ -107,6 +114,14 @@ export function HighlightedTextArea({
       >
         {renderMarked(value, marks, onWordClick)}
       </div>
+      {busyLabel && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-panel/85 px-4 text-center">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-fg">
+            <span className="mr-2 inline-block animate-pulse">▓</span>
+            {busyLabel}
+          </span>
+        </div>
+      )}
       <textarea
         ref={taRef}
         value={value}
