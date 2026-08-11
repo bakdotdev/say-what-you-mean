@@ -18,7 +18,7 @@ import { isCarrierWord } from "../codec/equations"
 const BASE = "https://lab.bak.dev/say-what-you-mean/api"
 const VOCAB = readFileSync("public/wordlist.txt", "utf8")
   .split("\n").map((w) => w.trim()).filter(Boolean)
-const COMMON_WORD_COUNT = 9439
+const COMMON_WORD_COUNT = 9160
 
 const SECRET = "DOCK AT 9"
 const PASS = "swordfish"
@@ -94,10 +94,35 @@ live("polish pass", async () => {
   const keep = await keepList(encoder, repaired.text)
   console.log(`KEEP ${keep.length} words`)
 
-  const { carrier: polished } = await post("polish", {
-    carrier: repaired.text,
-    keep,
-  })
+  // Chunked. A whole garbled passage trips the provider content filter —
+  // random substitution throws up phrases like "I got asian from the corner
+  // shop" — but a few sentences at a time usually does not, and a chunk that
+  // is refused simply stays as it was.
+  const sentences = repaired.text.split(/(?<=[.!?])\s+/).filter(Boolean)
+  const chunks: string[] = []
+  // One sentence at a time. Four-sentence chunks carried ~15 corruptions
+  // each and read as gibberish, which the provider refuses; clean prose with
+  // the same KEEP list is accepted, so it is the corruption density that
+  // matters, not the task framing.
+  for (const sentence of sentences) chunks.push(sentence)
+  let refused = 0
+  const polishedChunks = await Promise.all(
+    chunks.map(async (chunk) => {
+      const words = new Set(tokenizeSpans(chunk).map((sp) => sp.word))
+      const chunkKeep = keep.filter((w) => words.has(w))
+      if (!chunkKeep.length) return chunk
+      try {
+        const { carrier } = await post("polish", { carrier: chunk, keep: chunkKeep })
+        return carrier || chunk
+      } catch (err) {
+        refused++
+        console.log(`REFUSED ${String(err).slice(0, 180)}`)
+        return chunk
+      }
+    }),
+  )
+  const polished = polishedChunks.join(" ")
+  console.log(`CHUNKS ${chunks.length}, refused ${refused}`)
   const kept = new Set(tokenizeSpans(polished).map((s) => s.word))
   const dropped = keep.filter((w) => !kept.has(w))
   const after = await repair(encoder, polished, fitting)

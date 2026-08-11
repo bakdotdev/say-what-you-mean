@@ -36,8 +36,34 @@ const EXTRA = (
   // Piracy spam
   "warez keygen crackz serialz " +
   // Misc adult-site residue the profanity list misses
-  "escort escorts brothel camgirl upskirt fetish milf hookup"
-).split(/\s+/)
+  "escort escorts brothel camgirl upskirt fetish milf hookup " +
+  // Identity terms. Not offensive in themselves — the problem is that
+  // substitution drops them into sentences at random, which produced "like a
+  // sensible asian" in a test carrier. Nobody should find that in a message
+  // they are about to send, and the model provider refuses to process it.
+  "asian asians african africans american americans european europeans " +
+  "arab arabs jew jews jewish muslim muslims christian christians hindu " +
+  "buddhist catholic protestant mormon atheist islam judaism christianity " +
+  "black blacks white whites latino latina hispanic indian indians native " +
+  "chinese japanese korean vietnamese mexican russian german french " +
+  "british english irish scottish italian spanish polish turkish iranian " +
+  "iraqi israeli palestinian afghan pakistani nigerian egyptian " +
+  "israel iraq iran afghanistan palestine syria " +
+  "race racial racism racist ethnic ethnicity gender transgender " +
+  "immigrant immigrants refugee refugees minority minorities " +
+  // Illness and death, for the same reason
+  "cancer tumor tumour disease diseases illness dying dead death deaths " +
+  "blood bleeding wound wounded injury injured trauma abuse abused " +
+  "victim victims addiction addict alcoholic depression anxiety " +
+  // Crime, war and policing
+  "war wars army military soldier soldiers troops combat attack attacked " +
+  "weapon weapons crime crimes criminal police arrest arrested prison " +
+  "jail inmate convicted felony assault robbery theft fraud violence " +
+  "violent threat threats hostage torture " +
+  // Politics, which reads as bizarre in a domestic paragraph anyway
+  "election elections vote voting voter president senate congress " +
+  "republican democrat democrats conservative liberal政"
+).split(/\s+/).filter((w) => /^[a-z']+$/.test(w))
 
 const banned = new Set([
   ...readFileSync(BLOCKED, "utf8").split("\n").map((w) => w.trim()).filter(Boolean),
