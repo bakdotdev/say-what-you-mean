@@ -20,4 +20,12 @@ export type { Equation, WordFeatureDigests } from "./equations"
 export { FEATURE_METHODS, featuresOf, MAX_DENSITY } from "./features"
 export type { FeatureMethod } from "./features"
 export { deriveKeys } from "./keys"
-export { payloadBitLength } from "./payload"
+export { payloadBitLength, buildPayload } from "./payload"
+export {
+  planEmbedding,
+  extractPayload,
+  analyzeCover,
+  wordParity,
+  slotColumn,
+} from "./matrix"
+export type { EmbedPlan, CoverAnalysis } from "./matrix"
