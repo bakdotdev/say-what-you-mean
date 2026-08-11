@@ -11,18 +11,6 @@
  * Uses the Vercel AI Gateway (OpenAI-compatible) with AI_GATEWAY_API_KEY.
  */
 
-interface SlotRequest {
-  /** Word currently at this slot. */
-  from: string
-  /** Words that satisfy the constraint; the model must pick one. */
-  options: string[]
-}
-
-interface Body {
-  carrier: string
-  slots: SlotRequest[]
-}
-
 const MODEL = "anthropic/claude-haiku-4.5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
@@ -39,7 +27,7 @@ Rules, in priority order:
 // signature below is the edge contract.
 export const config = { runtime: "edge" }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req) {
   if (req.method !== "POST") {
     return json({ error: "method not allowed" }, 405)
   }
@@ -47,9 +35,9 @@ export default async function handler(req: Request): Promise<Response> {
   const key = process.env.AI_GATEWAY_API_KEY
   if (!key) return json({ error: "AI_GATEWAY_API_KEY not configured" }, 500)
 
-  let body: Body
+  let body
   try {
-    body = (await req.json()) as Body
+    body = await req.json()
   } catch {
     return json({ error: "invalid json" }, 400)
   }
@@ -102,9 +90,7 @@ export default async function handler(req: Request): Promise<Response> {
       )
     }
 
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string } }[]
-    }
+    const data = await res.json()
     const rewritten = data.choices?.[0]?.message?.content?.trim()
     if (!rewritten) return json({ error: "empty completion" }, 502)
 
@@ -117,7 +103,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 }
 
-const json = (value: unknown, status = 200): Response =>
+const json = (value, status = 200) =>
   new Response(JSON.stringify(value), {
     status,
     headers: { "content-type": "application/json" },
