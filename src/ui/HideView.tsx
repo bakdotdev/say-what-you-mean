@@ -18,6 +18,8 @@ import {
 } from "./HighlightedTextArea"
 import { Columns } from "./Columns"
 import { About } from "./About"
+import { Instructions } from "./Instructions"
+import { useFreeWords } from "./useFreeWords"
 import { SwapPicker } from "./SwapPicker"
 import { Telemetry } from "./Telemetry"
 import { useAiRewrite } from "./useAiRewrite"
@@ -39,11 +41,16 @@ export function HideView({
   const [copied, setCopied] = useState(false)
   const [applying, setApplying] = useState(false)
   const [picking, setPicking] = useState<number | null>(null)
+  const [freeWrite, setFreeWrite] = useState(false)
   const ai = useAiRewrite()
   const generator = useCarrierGenerator()
   const durableGen = useDurableGenerator()
 
   const vocabulary = useVocabulary()
+  const freeWords = useFreeWords(
+    freeWrite && durable ? passphrase : "",
+    vocabulary,
+  )
   const status = useMatrixPlan(secret, passphrase, carrier, locked)
   const durablePlan = useDurablePlan(secret, passphrase, carrier, durable)
   const spans = useMemo(() => tokenizeSpans(carrier), [carrier])
@@ -190,6 +197,23 @@ export function HideView({
           ? "Survives deleted or reordered words. Needs about twice the length."
           : "Shortest carrier. Any word edit breaks it."}
       </p>
+      {durable && (
+        <label className="mt-3 flex cursor-pointer items-start gap-2 border-t border-edge pt-3 text-[10px] leading-relaxed tracking-wider text-muted">
+          <input
+            type="checkbox"
+            checked={freeWrite}
+            onChange={(e) => setFreeWrite(e.target.checked)}
+            className="mt-0.5 accent-accent"
+            aria-label="Free-write mode"
+          />
+          <span>
+            <span className="text-fg-dim">FREE-WRITE</span>
+            <br />
+            Suggests only words that carry nothing, so anything you add stays
+            free.
+          </span>
+        </label>
+      )}
       <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
         <div className="flex justify-between">
           <dt className="text-muted">payload</dt>
@@ -273,7 +297,12 @@ export function HideView({
         }
         disabled={!ready}
         ariaLabel="Carrier text"
-        onWordClick={toggleLock}
+        onWordClick={(slot) => {
+          // A word that needs changing wants replacements; anything else is
+          // a lock toggle.
+          if (flipSet.has(slot)) setPicking(slot)
+          else toggleLock(slot)
+        }}
       />
       </div>
       {/* Swatches use MARK_STYLES, the same source as the text, so the
@@ -283,26 +312,47 @@ export function HideView({
           <span className={`font-mono text-fg ${MARK_STYLES.carrier}`}>
             WORD
           </span>
-          BEING CHANGED
+          NEEDS CHANGING
         </span>
         <span className="flex items-center gap-2">
           <span className={`font-mono text-fg ${MARK_STYLES.required}`}>
             WORD
           </span>
-          REQUIRED
+          CARRIES A CLUE
         </span>
         <span className="flex items-center gap-2">
           <span className={`font-mono text-fg ${MARK_STYLES.locked}`}>
             WORD
           </span>
-          LOCKED BY YOU
+          LOCKED
         </span>
         <span className="flex items-center gap-2">
           <span className="font-mono text-muted">WORD</span>
-          FREE
+          FREE TO EDIT
         </span>
-        <span>CLICK TO LOCK</span>
+        <span>CLICK A WORD FOR OPTIONS</span>
       </div>
+      {freeWrite && durable && freeWords.length > 0 && (
+        <div className="mt-3 border-t border-edge pt-3">
+          <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">
+            free words — carry nothing, click to add
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {freeWords.map((w) => (
+              <button
+                key={w}
+                onClick={() => {
+                  setCarrier((c) => (c.trim() ? `${c.trimEnd()} ${w}` : w))
+                  setCopied(false)
+                }}
+                className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs normal-case text-fg-dim hover:border-accent hover:text-fg"
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <Button
         variant={embedded ? "ready" : "ghost"}
         onClick={copy}
@@ -390,12 +440,12 @@ export function HideView({
         <>
           {payloadPanel}
           {carrierPanel}
+          <Instructions durable={durable} />
           <About />
         </>
       }
       right={
         <>
-          {statusPanel}
           {picking !== null && spans[picking] && (
             <SwapPicker
               word={spans[picking].word}
@@ -414,6 +464,7 @@ export function HideView({
               onClose={() => setPicking(null)}
             />
           )}
+          {statusPanel}
           {ready && (
             <Telemetry
               carrier={carrier}
