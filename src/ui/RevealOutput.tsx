@@ -1,15 +1,9 @@
 /**
- * The decoded-secret display, with a layered reveal effect.
+ * The decoded-secret display.
  *
- * Canvas UI's DecryptReveal renders a WebGL cipher curtain over live HTML that
- * decrypts around the cursor — but it depends on the html-in-canvas API
- * (`ctx.drawElementImage` + `canvas.requestPaint`), which ships only behind
- * chrome://flags/#canvas-draw-element or a Chrome origin trial. Everywhere
- * else it silently renders plain HTML.
- *
- * So: use the real effect when the browser actually supports it, and fall back
- * to a character-scramble decrypt (no experimental APIs) otherwise. Both paths
- * show an animated reveal; only the fidelity differs.
+ * The Canvas UI cipher curtain is behind PAGE_EFFECT_ENABLED; while that is
+ * off we use the character-scramble decrypt, which needs no experimental APIs
+ * and works in every browser.
  */
 import { useEffect, useState } from "react"
 import {
@@ -17,14 +11,12 @@ import {
   supportsHtmlInCanvas,
 } from "../components/canvasui/DecryptReveal"
 import { DecryptText } from "./DecryptText"
-
-const AMBER = "#ffb62e"
+import { EFFECT_COLOR, PAGE_EFFECT_ENABLED } from "./PageEffect"
 
 export function RevealOutput({ secret }: { secret: string }) {
-  // Detect after mount — supportsHtmlInCanvas touches document.
   const [rich, setRich] = useState(false)
   useEffect(() => {
-    setRich(supportsHtmlInCanvas())
+    setRich(PAGE_EFFECT_ENABLED && supportsHtmlInCanvas())
   }, [])
 
   if (!rich) {
@@ -42,7 +34,7 @@ export function RevealOutput({ secret }: { secret: string }) {
   return (
     <DecryptReveal
       key={secret}
-      color={AMBER}
+      color={EFFECT_COLOR}
       radius={240}
       cell={10}
       passthrough={0.12}

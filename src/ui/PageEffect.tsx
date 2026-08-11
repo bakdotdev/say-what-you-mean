@@ -1,23 +1,29 @@
 /**
- * Wraps the whole app in the Canvas UI decrypt-reveal cipher curtain.
+ * Optional page-wide decrypt-reveal cipher curtain (Canvas UI).
  *
- * The component handles its own capability detection: where Chrome's
- * HTML-in-Canvas API is unavailable it renders children as ordinary DOM with
- * no errors. So we always mount it and let it decide — gating it ourselves
- * only risks never mounting it at all.
+ * Currently disabled. Flip PAGE_EFFECT_ENABLED to re-enable — the wiring,
+ * props and colour are kept intact so it is a one-line change.
  *
- * Enabled by chrome://flags/#canvas-draw-element locally, or by the
- * origin-trial token injected into <head> at build time for deployed visitors.
+ * When on, it needs Chrome's HTML-in-Canvas API: chrome://flags/#canvas-draw-element
+ * locally, or the origin-trial token injected into <head> at build time from
+ * HTML_IN_CANVAS. Without support the component renders children as ordinary
+ * DOM, so it is always safe to mount.
  */
 import type { ReactNode } from "react"
 import { DecryptReveal } from "../components/canvasui/DecryptReveal"
 
-const AMBER = "#ffb62e"
+/** Cipher colour — the app's amber. */
+export const EFFECT_COLOR = "#ffb62e"
+
+/** Master switch for the page-wide effect. */
+export const PAGE_EFFECT_ENABLED = false
 
 export function PageEffect({ children }: { children: ReactNode }) {
+  if (!PAGE_EFFECT_ENABLED) return <>{children}</>
+
   return (
     <DecryptReveal
-      color={AMBER}
+      color={EFFECT_COLOR}
       radius={320}
       softness={0.5}
       cell={10}
@@ -26,8 +32,6 @@ export function PageEffect({ children }: { children: ReactNode }) {
       edgeGlow={2}
       scramble={0.1}
       scrambleSpeed={6}
-      // Chromatic aberration off — set through the documented prop so the
-      // vendored component stays byte-identical to upstream.
       aberration={0}
       background="#0b0a08"
       className="block min-h-screen"

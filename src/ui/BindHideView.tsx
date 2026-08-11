@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react"
 import { bindSecret, normalizeSecret, MAX_SECRET_LENGTH } from "../codec"
 import {
-  Button,
   CopyableField,
   Field,
   Panel,
@@ -61,34 +60,43 @@ export function BindHideView() {
   const words = carrier.trim() ? carrier.trim().split(/\s+/).length : 0
 
   /**
-   * Hand the encrypted blob to the escrow so the recipient needs nothing but
-   * the paragraph and the passphrase. The server sees an un-invertible id and
-   * a ciphertext it cannot decrypt.
+   * Hand the encrypted blob to the escrow automatically, so there is never a
+   * key for anyone to copy. The server sees an un-invertible id and a
+   * ciphertext it cannot decrypt.
    */
-  const sendToEscrow = async () => {
+  useEffect(() => {
     if (!key || !lookupId) return
+    let cancelled = false
     setEscrow("sending")
     setEscrowError(null)
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/keys`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: lookupId, blob: key }),
-      })
-      if (!res.ok) {
-        const detail = (await res.json().catch(() => ({}))) as {
-          error?: string
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}api/keys`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: lookupId, blob: key }),
+        })
+        if (cancelled) return
+        if (!res.ok) {
+          const detail = (await res.json().catch(() => ({}))) as {
+            error?: string
+          }
+          setEscrowError(detail.error ?? `store failed (${res.status})`)
+          setEscrow("failed")
+          return
         }
-        setEscrowError(detail.error ?? `store failed (${res.status})`)
+        setEscrow("sent")
+      } catch (err) {
+        if (cancelled) return
+        setEscrowError(err instanceof Error ? err.message : String(err))
         setEscrow("failed")
-        return
       }
-      setEscrow("sent")
-    } catch (err) {
-      setEscrowError(err instanceof Error ? err.message : String(err))
-      setEscrow("failed")
+    }, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
     }
-  }
+  }, [key, lookupId])
 
   return (
     <Columns
@@ -111,8 +119,8 @@ export function BindHideView() {
               <dd className="text-fg">{fingerprint || "—"}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted">key size</dt>
-              <dd className="text-fg">{key ? `${key.length / 2} bytes` : "—"}</dd>
+              <dt className="text-muted">key</dt>
+              <dd className="text-fg">{key ? "held in escrow" : "—"}</dd>
             </div>
           </dl>
         </Panel>
@@ -173,7 +181,7 @@ export function BindHideView() {
             </p>
           </Panel>
 
-          <About />
+          <About version="v2" />
         </>
       }
       right={
@@ -184,62 +192,28 @@ export function BindHideView() {
             </Panel>
           )}
           <Panel
-            title="key"
-            right={key ? <Tag tone="green">bound</Tag> : <Tag>waiting</Tag>}
-          >
-            {key ? (
-              <>
-                <CopyableField value={key} label="copy key">
-                  <TextInput
-                    readOnly
-                    value={key}
-                    aria-label="Generated key"
-                    className="font-mono"
-                  />
-                </CopyableField>
-                <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-                  // send this alongside the carrier, by any separate channel
-                </p>
-              </>
-            ) : (
-              <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-                // enter a secret, a passphrase and some carrier text
-              </p>
-            )}
-          </Panel>
-
-          <Panel
-            title="escrow"
+            title="status"
             right={
               escrow === "sent" ? (
-                <Tag tone="green">stored</Tag>
+                <Tag tone="green">ready</Tag>
               ) : escrow === "failed" ? (
                 <Tag tone="red">failed</Tag>
+              ) : escrow === "sending" ? (
+                <Tag>storing</Tag>
               ) : (
-                <Tag>optional</Tag>
+                <Tag>waiting</Tag>
               )
             }
           >
             <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-              // store the key so your recipient pastes nothing but the
-              paragraph. it is deleted the first time it is read.
+              {escrow === "sent"
+                ? "// send the carrier text. your recipient needs only that and the passphrase."
+                : escrow === "sending"
+                  ? "// storing…"
+                  : escrow === "failed"
+                    ? `// ${escrowError ?? "could not store"}`
+                    : "// enter a secret, a passphrase and some carrier text"}
             </p>
-            <Button
-              onClick={sendToEscrow}
-              disabled={!key || escrow === "sending" || escrow === "sent"}
-              className="mt-2 w-full"
-            >
-              {escrow === "sending"
-                ? "storing…"
-                : escrow === "sent"
-                  ? "stored ✓ — send only the text"
-                  : "store key · burn after reading"}
-            </Button>
-            {escrowError && (
-              <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-fg">
-                // {escrowError}
-              </p>
-            )}
           </Panel>
 
           <Panel title="properties">
