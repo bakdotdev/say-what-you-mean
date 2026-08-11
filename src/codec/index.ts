@@ -29,5 +29,10 @@ export {
   slotColumn,
 } from "./matrix"
 export type { EmbedPlan, CoverAnalysis } from "./matrix"
-export { bindSecret, unbindSecret, digestWords } from "./bind"
+export {
+  bindSecret,
+  unbindSecret,
+  digestWords,
+  lookupIdFromPassphrase,
+} from "./bind"
 export type { BoundKey } from "./bind"

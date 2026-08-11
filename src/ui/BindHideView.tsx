@@ -3,7 +3,15 @@
  */
 import { useEffect, useState } from "react"
 import { bindSecret, normalizeSecret, MAX_SECRET_LENGTH } from "../codec"
-import { CopyableField, Field, Panel, Tag, TextArea, TextInput } from "./primitives"
+import {
+  Button,
+  CopyableField,
+  Field,
+  Panel,
+  Tag,
+  TextArea,
+  TextInput,
+} from "./primitives"
 import { Columns } from "./Columns"
 import { About } from "./About"
 
@@ -14,11 +22,18 @@ export function BindHideView() {
   const [key, setKey] = useState("")
   const [fingerprint, setFingerprint] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [lookupId, setLookupId] = useState("")
+  const [escrow, setEscrow] = useState<"idle" | "sending" | "sent" | "failed">(
+    "idle",
+  )
+  const [escrowError, setEscrowError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!secret || !passphrase || !carrier.trim()) {
       setKey("")
       setFingerprint("")
+      setLookupId("")
+      setEscrow("idle")
       setError(null)
       return
     }
@@ -29,6 +44,8 @@ export function BindHideView() {
           if (cancelled) return
           setKey(r.key)
           setFingerprint(r.fingerprint)
+          setLookupId(r.lookupId)
+          setEscrow("idle")
           setError(null)
         })
         .catch((e: unknown) => {
@@ -42,6 +59,36 @@ export function BindHideView() {
   }, [secret, passphrase, carrier])
 
   const words = carrier.trim() ? carrier.trim().split(/\s+/).length : 0
+
+  /**
+   * Hand the encrypted blob to the escrow so the recipient needs nothing but
+   * the paragraph and the passphrase. The server sees an un-invertible id and
+   * a ciphertext it cannot decrypt.
+   */
+  const sendToEscrow = async () => {
+    if (!key || !lookupId) return
+    setEscrow("sending")
+    setEscrowError(null)
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/keys`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: lookupId, blob: key }),
+      })
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => ({}))) as {
+          error?: string
+        }
+        setEscrowError(detail.error ?? `store failed (${res.status})`)
+        setEscrow("failed")
+        return
+      }
+      setEscrow("sent")
+    } catch (err) {
+      setEscrowError(err instanceof Error ? err.message : String(err))
+      setEscrow("failed")
+    }
+  }
 
   return (
     <Columns
@@ -157,6 +204,40 @@ export function BindHideView() {
             ) : (
               <p className="text-[10px] leading-relaxed tracking-wider text-muted">
                 // enter a secret, a passphrase and some carrier text
+              </p>
+            )}
+          </Panel>
+
+          <Panel
+            title="escrow"
+            right={
+              escrow === "sent" ? (
+                <Tag tone="green">stored</Tag>
+              ) : escrow === "failed" ? (
+                <Tag tone="red">failed</Tag>
+              ) : (
+                <Tag>optional</Tag>
+              )
+            }
+          >
+            <p className="text-[10px] leading-relaxed tracking-wider text-muted">
+              // store the key so your recipient pastes nothing but the
+              paragraph. it is deleted the first time it is read.
+            </p>
+            <Button
+              onClick={sendToEscrow}
+              disabled={!key || escrow === "sending" || escrow === "sent"}
+              className="mt-2 w-full"
+            >
+              {escrow === "sending"
+                ? "storing…"
+                : escrow === "sent"
+                  ? "stored ✓ — send only the text"
+                  : "store key · burn after reading"}
+            </Button>
+            {escrowError && (
+              <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-fg">
+                // {escrowError}
               </p>
             )}
           </Panel>

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest"
-import { bindSecret, unbindSecret, digestWords } from "./bind"
+import {
+  bindSecret,
+  unbindSecret,
+  digestWords,
+  lookupIdFromPassphrase,
+} from "./bind"
 import { deriveKeys } from "./keys"
 import { bytesToHex } from "./bytes"
 
@@ -65,5 +70,28 @@ describe("text-bound keys", () => {
     const a = await digestWords("The cow, ate!", keys)
     const b = await digestWords("the   COW ate", keys)
     expect(bytesToHex(a)).toBe(bytesToHex(b))
+  }, 60_000)
+})
+
+describe("escrow lookup ids", () => {
+  it("needs both the passphrase and the exact carrier", async () => {
+    const a = await lookupIdFromPassphrase("pass", CARRIER)
+    expect(await lookupIdFromPassphrase("pass", CARRIER)).toBe(a)
+    expect(await lookupIdFromPassphrase("other", CARRIER)).not.toBe(a)
+    expect(
+      await lookupIdFromPassphrase("pass", CARRIER.replace("laptop", "notebook")),
+    ).not.toBe(a)
+  }, 60_000)
+
+  it("is a 32-char hex id and matches the one bindSecret reports", async () => {
+    const { lookupId } = await bindSecret("DOCK AT 9", "pass", CARRIER)
+    expect(lookupId).toMatch(/^[0-9a-f]{32}$/)
+    expect(lookupId).toBe(await lookupIdFromPassphrase("pass", CARRIER))
+  }, 60_000)
+
+  it("is unrelated to the key that decrypts the blob", async () => {
+    const { key, lookupId } = await bindSecret("DOCK AT 9", "pass", CARRIER)
+    expect(lookupId).not.toBe(key)
+    expect(key.includes(lookupId)).toBe(false)
   }, 60_000)
 })

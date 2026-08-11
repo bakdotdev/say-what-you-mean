@@ -74,6 +74,12 @@ export interface BoundKey {
   key: string
   /** Bytes of the carrier's word digest, for display. */
   fingerprint: string
+  /**
+   * Server-side lookup id for burn-after-reading escrow. A hash of the
+   * passphrase and the carrier's words, so the server can neither invert it
+   * nor derive the pad that decrypts the stored blob.
+   */
+  lookupId: string
 }
 
 export const bindSecret = async (
@@ -101,7 +107,31 @@ export const bindSecret = async (
   return {
     key: bytesToHex(concatBytes(cipher, tag)),
     fingerprint: bytesToHex(digest.slice(0, 4)),
+    lookupId: await lookupIdFor(carrier, keys),
   }
+}
+
+/**
+ * Escrow lookup id: HMAC over the carrier digest under the mac key. Requires
+ * both the exact words and the passphrase, so it cannot be guessed from either
+ * alone, and it is unrelated to the pad that actually decrypts the blob.
+ */
+export const lookupIdFor = async (
+  carrier: string,
+  keys: Keys,
+): Promise<string> => {
+  const digest = await digestWords(carrier, keys)
+  const id = await hmac(keys.mac, concatBytes(digest, textToBytes("|lookup")))
+  return bytesToHex(id.slice(0, 16))
+}
+
+/** Convenience: the id for a passphrase + carrier, without binding a secret. */
+export const lookupIdFromPassphrase = async (
+  passphrase: string,
+  carrier: string,
+): Promise<string> => {
+  const keys = await deriveKeys(passphrase)
+  return lookupIdFor(carrier, keys)
 }
 
 export const unbindSecret = async (
