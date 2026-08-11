@@ -22,6 +22,11 @@
  */
 import { put, get, del } from "@vercel/blob"
 
+// Edge runtime: this handler uses the Web Request/Response signature. Without
+// this the function runs as Node.js, where `req` is an IncomingMessage whose
+// `url` is a bare path — and `new URL(path)` throws "Invalid URL".
+export const config = { runtime: "edge" }
+
 const PREFIX = "swym/keys"
 const MAX_BLOB_CHARS = 512
 
