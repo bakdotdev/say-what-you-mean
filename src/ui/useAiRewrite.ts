@@ -100,17 +100,23 @@ export function useAiRewrite() {
             body: JSON.stringify({ carrier: current, slots }),
           })
           if (!res.ok) {
+            // A 404 almost always means a stale bundle calling a route that
+            // did not exist in the deployment it was loaded from; say so
+            // rather than leaving a bare status code.
             const detail = (await res.json().catch(() => ({}))) as {
               error?: string
             }
-            setState({
-              busy: false,
-              error: detail.error ?? `rewrite failed (${res.status})`,
-              attempts: attempt,
-            })
+            const message =
+              res.status === 404
+                ? "endpoint not found — reload the page (stale build)"
+                : (detail.error ?? `rewrite failed (${res.status})`)
+            setState({ busy: false, error: message, attempts: attempt })
             return null
           }
-          const { rewritten } = (await res.json()) as { rewritten: string }
+          const parsed = (await res.json().catch(() => null)) as {
+            rewritten?: string
+          } | null
+          const rewritten = parsed?.rewritten
           if (!rewritten || rewritten === current) break
           current = rewritten
         }
