@@ -20,7 +20,13 @@ import { wordParity, type deriveKeys } from "../codec"
  * "dighting"). Both extremes wreck the prose in opposite ways.
  */
 const FUNCTION_WORD_RANK = 300
-const COMMON_WORD_LIMIT = 9000
+/**
+ * Widened well past the Google 10k. Function words can never carry, and only
+ * half the remainder does, so excluding them thinned the usable pool — this
+ * draws on the larger dictionary to make that back. 30k still reads as
+ * ordinary English; beyond it the list turns archaic.
+ */
+const COMMON_WORD_LIMIT = 30000
 
 export const OPTIONS_PER_SLOT = 24
 

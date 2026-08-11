@@ -24,8 +24,10 @@ describe("candidates", () => {
     // none may be a top-300 function word
     for (const o of options) {
       expect(vocab.indexOf(o)).toBeGreaterThanOrEqual(300)
-      // nor from the archaic tail
-      expect(vocab.indexOf(o)).toBeLessThan(9000)
+      // nor from the archaic tail. 30k is the deliberate bound: function
+      // words can never carry and only half the rest does, so the pool needs
+      // to reach past the Google 10k to stay rich.
+      expect(vocab.indexOf(o)).toBeLessThan(30000)
       expect(o.length).toBeGreaterThanOrEqual(4)
     }
   }, 60_000)

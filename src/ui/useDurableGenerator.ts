@@ -165,7 +165,18 @@ export function useDurableGenerator() {
           // Cleanest first, so the least-repaired text leads.
           kept.sort((a, b) => a.strays - b.strays)
 
-          const candidate = kept.map((k) => k.sentence).join(" ")
+          // Repair BEFORE testing. Harvested sentences still contain stray
+          // carriers, so raw accumulated text never reports solved — which is
+          // why earlier runs piled up 700+ words and still failed. Repairing
+          // each round means the loop actually converges, and it stops at the
+          // first length that works instead of running to the cap.
+          const raw = kept.map((k) => k.sentence).join(" ")
+          const candidate = await repair(
+            encoder,
+            raw,
+            vocabulary,
+            `${base}api/rewrite`,
+          )
           if ((await encoder.evaluate(candidate)).solved) {
             // Harvested sentences come from different runs and topics, so they
             // read as fragments. Ask for one coherent paragraph built ONLY
@@ -206,7 +217,7 @@ export function useDurableGenerator() {
           return null
         }
 
-        // Repair the few strays inside the sentences we kept.
+        // Final attempt on everything harvested.
         setState({ busy: true, stage: "fitting the last few words…", error: null })
         const repaired = await repair(
           encoder,

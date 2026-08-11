@@ -13,7 +13,7 @@ import { isCarrierWord, wordDigests } from "../codec/equations"
 import { FUNCTION_WORDS } from "../codec/features"
 
 const WANTED = 60
-const MAX_PROBES = 2500
+const MAX_PROBES = 4000
 /**
  * Function words are free by definition — they are never used to decrypt,
  * whatever their hash says — so they lead the list. They are also the words
