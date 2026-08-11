@@ -354,24 +354,27 @@ export function HideView({
           </span>
         }
       >
-        <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
-          {freeWords.map((w) => (
-            <button
-              key={w}
-              onClick={() => {
-                setCarrier((c) => (c.trim() ? `${c.trimEnd()} ${w}` : w))
-                setCopied(false)
-              }}
-              className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs normal-case text-fg-dim hover:border-accent hover:text-fg"
-            >
-              {w}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-          {freeWords.length} words you can add anywhere — none affect the
-          message.
-        </p>
+        {/* Open by default: the list is the point of the panel. It used to
+            scroll inside a fixed height, which hid most of it. */}
+        <details open>
+          <summary className="cursor-pointer text-[10px] uppercase tracking-[0.18em] text-muted">
+            {freeWords.length} words you can add anywhere
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {freeWords.map((w) => (
+              <button
+                key={w}
+                onClick={() => {
+                  setCarrier((c) => (c.trim() ? `${c.trimEnd()} ${w}` : w))
+                  setCopied(false)
+                }}
+                className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs normal-case text-fg-dim hover:border-accent hover:text-fg"
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </details>
       </Panel>
     ) : null
 
