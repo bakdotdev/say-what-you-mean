@@ -1,25 +1,36 @@
 /**
  * Carrier generation for durable (edit-tolerant) mode.
  *
- * Earlier versions generated one paragraph then mechanically swapped every
- * word that didn't fit. That is what wrecked the prose: replacing ~30% of a
- * paragraph with words chosen by constraint rather than meaning leaves
- * grammatical nonsense.
+ * What actually decides success is the number of DISTINCT fitting carrier
+ * words, and nothing before this measured it. Repeated words add no
+ * information — a word's clue depends only on the word — so a 515-word
+ * paragraph with 242 distinct words yields only ~50 distinct carriers however
+ * long it grows. Measured against the real decoder at a 74-bit payload:
  *
- * This harvests instead. Per-word embedding is position-free — a fitting word
- * carries the same clue wherever it sits — so sentences concatenate freely.
- * We generate in short runs and keep the sentences that ALREADY fit best,
- * repairing only their handful of stray words.
+ *   density 1 → ~180 distinct carriers   (≈1800 words: unreachable)
+ *   density 2 → ~55                      (≈600 words)
  *
- * Demanding perfectly clean sentences does not work: at ~70% word adherence a
- * twelve-word sentence is fully clean about 1% of the time, and eight runs
- * yielded none. But sentences with one or two strays are common, and fixing
- * one word barely dents readability — where swapping 30% of a paragraph
- * destroys it. So we rank by how little repair a sentence needs and take the
- * cleanest.
+ * Two earlier designs failed on this. Harvesting sentences that already fit
+ * kept only ~9% of each run, so sixteen runs still ended ~5 carriers short
+ * while reading as stitched fragments. And the success test was
+ * `evaluate().solved`, which only asks whether the FITTING words cover the
+ * payload — the real decoder also rejects the contradictions thrown by
+ * carriers that do not fit, so generation reported success on text that
+ * decoded to null.
+ *
+ * So: write one long piece on one topic, replace every carrier that does not
+ * fit, and confirm with an actual decode. On real output that is ~5% of words
+ * changed, and one pass suffices because fitting is word-intrinsic — swapping
+ * one word never unfits another.
  */
 import { useCallback, useState } from "react"
-import { createEncoder, tokenizeSpans, type Encoder } from "../codec"
+import {
+  createEncoder,
+  decode,
+  DURABLE_DENSITY,
+  tokenizeSpans,
+  type Encoder,
+} from "../codec"
 import { isCarrierWord } from "../codec/equations"
 
 export interface DurableGenState {
@@ -29,28 +40,15 @@ export interface DurableGenState {
 }
 
 /**
- * A large allowed list is what actually makes the model stay in-vocabulary.
- * 800 was far too few — it strayed constantly and almost no sentence survived
- * harvesting. Generation runs on a Node function with a 60s budget so the
- * prompt can be this big.
+ * Words per request. Prose runs ~1 distinct carrier per 10 words, so this
+ * clears the ~55 needed with margin; the generate function has a 60s budget.
  */
-const ALLOWED_SAMPLE = 3000
-const COMMON_BAND = 9000
-/** Words per run. Short runs hold the vocabulary far better than long ones. */
-const RUN_WORDS = 350
-/**
- * Harvesting now keeps only sentences whose carriers fit, so each run yields
- * less text but far more usable text. More runs are needed to reach the
- * carrier count the payload requires — 8 stopped ~40 carriers short.
- */
-const MAX_RUNS = 16
-/**
- * Keep a sentence if at most this many of its CARRIER words need changing.
- * Judging by overall stray ratio was the bug: junk words dominate a sentence,
- * so a low ratio said nothing about whether the carriers actually fit, and the
- * harvest could gather 800+ words that still could not cover the payload.
- */
-const MAX_STRAY_CARRIERS = 1
+const RUN_WORDS = 700
+/** Extra passes when the first piece lands short of a decode. */
+const MAX_RUNS = 4
+/** Vocabulary band scanned for fitting replacements. */
+const COMMON_BAND = 20000
+const REPLACEMENT_POOL = 6000
 const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 
@@ -66,14 +64,6 @@ const TOPICS = [
   "the weather turning over a weekend",
   "a long drive with nothing much happening",
 ]
-
-/** Split into sentences, keeping their terminating punctuation. */
-const sentencesOf = (text: string): string[] =>
-  text
-    .replace(/\s+/g, " ")
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
 
 export function useDurableGenerator() {
   const [state, setState] = useState<DurableGenState>({
@@ -91,20 +81,21 @@ export function useDurableGenerator() {
       setState({ busy: true, stage: "choosing vocabulary…", error: null })
       try {
         const base = import.meta.env.BASE_URL
-        const encoder = await createEncoder(secret, passphrase, 1, true)
-        // Payload size drives how many carrier words we need before repairing.
-        const payloadBits = encoder.B
+        const encoder = await createEncoder(
+          secret,
+          passphrase,
+          DURABLE_DENSITY,
+          true,
+        )
 
         // Whether a word fits depends only on the word and the key, so the
-        // usable vocabulary is knowable before any text exists.
-        const allowed = await encoder.suggestFrom(
+        // replacement pool is knowable before any text exists.
+        const pool = await encoder.suggestFrom(
           "",
           vocabulary.slice(0, COMMON_BAND),
-          ALLOWED_SAMPLE,
+          REPLACEMENT_POOL,
           0,
         )
-        const allowedSet = new Set(allowed)
-        // Carrier membership is key-only, so it can be memoised per word.
         const carrierCache = new Map<string, boolean>()
         const isCarrier = async (word: string) => {
           const hit = carrierCache.get(word)
@@ -113,38 +104,42 @@ export function useDurableGenerator() {
           carrierCache.set(word, value)
           return value
         }
+        const fitting: string[] = []
+        for (const word of pool) if (await isCarrier(word)) fitting.push(word)
+        if (fitting.length === 0) {
+          setState({ busy: false, stage: "", error: "no usable words found" })
+          return null
+        }
 
-        const chosenTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)]
-        const kept: { sentence: string; strays: number }[] = []
+        const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)]
+        let text = ""
 
         for (let run = 1; run <= MAX_RUNS; run++) {
           setState({
             busy: true,
-            stage: `writing… (run ${run}, ${kept.length} sentences kept)`,
+            stage: run === 1 ? "writing…" : `writing more (${run})…`,
             error: null,
           })
-
-          // ONE topic for the whole generation. Rotating topics per run made
-          // the harvested sentences read as unrelated fragments — a kettle
-          // sentence beside a train-platform sentence — which is the main
-          // reason the result felt "all over the place".
-          const topic = chosenTopic
           const res = await fetch(`${base}api/generate`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             // No allowed-list: measured at 42-47% adherence, which IS chance
             // given the list is ~half the vocabulary — the models ignore it,
-            // and passing it made Sonnet return empty completions. Junk words
-            // and the function-word exemption already cut the constrained
-            // share to ~23%, so free prose plus a small repair beats a
-            // constraint nobody honours.
-            body: JSON.stringify({ words: RUN_WORDS, topic }),
+            // and passing it made Sonnet return empty completions. Repairing
+            // ~5% of words afterwards beats a constraint nobody honours.
+            body: JSON.stringify({
+              words: RUN_WORDS,
+              topic:
+                run === 1
+                  ? topic
+                  : `${topic} — continue the same account, same voice`,
+            }),
           })
           if (!res.ok) {
             const detail = (await res.json().catch(() => ({}))) as {
               error?: string
             }
-            if (kept.length === 0) {
+            if (!text) {
               setState({
                 busy: false,
                 stage: "",
@@ -156,108 +151,30 @@ export function useDurableGenerator() {
           }
           const { carrier } = (await res.json()) as { carrier?: string }
           if (!carrier) continue
-
-          // Only CARRIER words have to fit; junk words are ignored by the
-          // decoder, so they never count as strays however unusual they are.
-          for (const sentence of sentencesOf(carrier)) {
-            const words = tokenizeSpans(sentence).map((s) => s.word)
-            if (words.length < 4) continue
-            let carriers = 0
-            let strays = 0
-            for (const w of words) {
-              if (!(await isCarrier(w))) continue
-              carriers++
-              if (!allowedSet.has(w)) strays++
-            }
-            // A sentence with no carriers is pure filler: pleasant to read but
-            // it moves nothing, so it only adds length.
-            if (carriers > 0 && strays <= MAX_STRAY_CARRIERS) {
-              kept.push({ sentence, strays })
-            }
-          }
-          if (kept.length === 0) continue
-          // Cleanest first, so the least-repaired text leads.
-          kept.sort((a, b) => a.strays - b.strays)
-
-          // Harvested sentences still contain stray carriers, so raw text
-          // never reports solved on its own — earlier runs piled up 700+ words
-          // and still failed. But repairing every round is far too slow (many
-          // vocabulary scans plus an API call each time), so only attempt it
-          // once there is plausibly enough material: enough carrier words to
-          // cover the payload with headroom.
-          const raw = kept.map((k) => k.sentence).join(" ")
-          const rawState = await encoder.evaluate(raw)
-          if (rawState.solved) {
-            setState({ busy: false, stage: "", error: null })
-            return raw
-          }
-          // Coverage, not word count, is what decides whether repair can
-          // finish: determinedBits is how much of the payload the fitting
-          // carriers already pin down. Repairing before that is wasted work.
-          if (rawState.determinedBits < payloadBits * 0.85) continue
+          text = text ? `${text} ${carrier}` : carrier
 
           setState({ busy: true, stage: "fitting words…", error: null })
-          const candidate = await repair(
+          const repaired = await repair(
             encoder,
-            raw,
-            vocabulary,
+            text,
+            fitting,
             `${base}api/rewrite`,
           )
-          if ((await encoder.evaluate(candidate)).solved) {
-            // Harvested sentences come from different runs and topics, so they
-            // read as fragments. Ask for one coherent paragraph built ONLY
-            // from words already proven to fit — every word in that pool is
-            // known-good, so the result needs no repair at all.
-            setState({ busy: true, stage: "composing…", error: null })
-            const proven = [
-              ...new Set(
-                tokenizeSpans(candidate)
-                  .map((sp) => sp.word)
-                  .filter((w) => allowedSet.has(w)),
-              ),
-            ]
-            const polished = await composeFrom(
-              `${base}api/generate`,
-              proven,
-              Math.round(tokenizeSpans(candidate).length * 1.15),
-              `${chosenTopic}, as one continuous account`,
-            )
-            if (polished) {
-              const check = await encoder.evaluate(polished)
-              if (check.solved) {
-                setState({ busy: false, stage: "", error: null })
-                return polished
-              }
-            }
+          // The real decoder is the only success test that means anything.
+          setState({ busy: true, stage: "checking…", error: null })
+          if ((await decode(repaired, passphrase)).secret !== null) {
             setState({ busy: false, stage: "", error: null })
-            return candidate
+            return repaired
           }
+          text = repaired
         }
 
-        if (kept.length === 0) {
-          setState({
-            busy: false,
-            stage: "",
-            error: "no usable sentences came back — try again",
-          })
-          return null
-        }
-
-        // Final attempt on everything harvested.
-        setState({ busy: true, stage: "fitting the last few words…", error: null })
-        const repaired = await repair(
-          encoder,
-          kept.map((k) => k.sentence).join(" "),
-          vocabulary,
-          `${base}api/rewrite`,
-        )
-        const final = await encoder.evaluate(repaired)
         setState({
           busy: false,
           stage: "",
-          error: final.solved ? null : "not enough usable text — try again",
+          error: "not enough usable text — try again",
         })
-        return repaired
+        return text || null
       } catch (err) {
         setState({
           busy: false,
@@ -274,67 +191,48 @@ export function useDurableGenerator() {
 }
 
 /**
- * Ask for a single coherent paragraph using only words already proven to fit.
- * Returns null on any failure — the caller keeps the harvested text instead.
+ * Replace every carrier word that does not fit.
+ *
+ * Replacements must be DISTINCT from each other and from words already in the
+ * text: a repeated word repeats an equation it has already contributed, so
+ * duplicates cost coverage without shortening the repair.
  */
-async function composeFrom(
-  endpoint: string,
-  provenWords: readonly string[],
-  words: number,
-  topic: string,
-): Promise<string | null> {
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        words,
-        topic,
-        allowed: provenWords,
-      }),
-    })
-    if (!res.ok) return null
-    const { carrier } = (await res.json()) as { carrier?: string }
-    return carrier ?? null
-  } catch {
-    return null
-  }
-}
-
-/** Last-resort word substitution, used only when harvesting cannot finish. */
 async function repair(
   encoder: Encoder,
   carrier: string,
-  vocabulary: readonly string[],
+  fitting: readonly string[],
   endpoint: string,
 ): Promise<string> {
   const state = await encoder.evaluate(carrier)
-  if (state.solved) return carrier
   const spans = tokenizeSpans(carrier)
   const unfit = state.words
     .map((w, i) => (w.green ? -1 : i))
     .filter((i) => i >= 0)
   if (!unfit.length) return carrier
 
+  const used = new Set(spans.map((s) => s.word))
   const specs: { slot: number; from: string; options: string[] }[] = []
   for (const [n, slot] of unfit.entries()) {
     const span = spans[slot]
     if (!span) continue
-    const pool = await encoder.suggestFrom(
-      carrier,
-      vocabulary,
-      CANDIDATE_POOL,
-      n * 137,
+    const seed = (n * 137) % Math.max(1, fitting.length)
+    const options: string[] = []
+    for (let i = 0; i < fitting.length && options.length < OPTIONS_PER_SLOT; i++) {
+      const word = fitting[(seed + i) % fitting.length]
+      if (used.has(word) || word.length < 3) continue
+      options.push(word)
+      if (options.length >= CANDIDATE_POOL) break
+    }
+    if (!options.length) continue
+    // Similar length reads least like a substitution.
+    options.sort(
+      (a, b) =>
+        Math.abs(a.length - span.word.length) -
+        Math.abs(b.length - span.word.length),
     )
-    const options = pool
-      .filter((w) => w !== span.word && w.length >= 3)
-      .sort(
-        (a, b) =>
-          Math.abs(a.length - span.word.length) -
-          Math.abs(b.length - span.word.length),
-      )
-      .slice(0, OPTIONS_PER_SLOT)
-    if (options.length) specs.push({ slot, from: span.word, options })
+    // Reserve them so no two slots can be offered the same word.
+    for (const word of options) used.add(word)
+    specs.push({ slot, from: span.word, options })
   }
   if (!specs.length) return carrier
 

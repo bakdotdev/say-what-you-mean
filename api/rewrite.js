@@ -23,8 +23,10 @@ export const config = { runtime: "edge" }
 const MODEL = "anthropic/claude-haiku-4.5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
-const MAX_CARRIER = 6000
-const MAX_SLOTS = 60
+// Durable carriers run ~700 words per pass and accumulate across passes, so
+// the whole text (not just the new part) is sent for context each time.
+const MAX_CARRIER = 12000
+const MAX_SLOTS = 80
 const MAX_OPTIONS = 30
 
 // Per-IP token bucket. Edge instances are ephemeral and not shared, so this is

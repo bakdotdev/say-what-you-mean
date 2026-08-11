@@ -1,66 +1,83 @@
-import { describe, it, expect } from "vitest"
+/**
+ * Guards the durable-mode density choice.
+ *
+ * Two bugs lived here. `evaluate().solved` only asks whether the FITTING
+ * words cover the payload, so generation reported success on text the real
+ * decoder rejected — carriers that do not fit contribute contradictory
+ * equations. And at density 1 a 74-bit payload needs ~180 distinct carrier
+ * words, which ordinary prose (~1 distinct carrier per 10 words) reaches only
+ * past 1800 words, so it never converged.
+ *
+ * These tests therefore assert against `decode`, never against `solved`.
+ */
+import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
-import { createEncoder, decode, tokenize } from "../codec"
+import { createEncoder, decode, DURABLE_DENSITY, tokenizeSpans } from "."
+import { isCarrierWord } from "./equations"
 
-const vocab = readFileSync(resolve(process.cwd(), "public/wordlist.txt"), "utf8")
+const VOCAB = readFileSync("public/wordlist.txt", "utf8")
   .split("\n")
   .map((w) => w.trim())
   .filter(Boolean)
-  .slice(0, 4000)
+  .slice(0, 20000)
 
-/** Build a durable carrier the way the generator does: keep only fitting words. */
-const buildDurable = async (secret: string, pass: string) => {
-  const encoder = await createEncoder(secret, pass, 1)
-  const green = await encoder.suggestFrom("", vocab, 4000, 0)
-  const words: string[] = []
-  for (const w of green) {
-    words.push(w)
-    if (words.length % 20 === 0) {
-      const st = await encoder.evaluate(words.join(" "))
-      if (st.solved) return words.join(" ")
-    }
+const SECRET = "DOCK AT 9"
+const PASS = "swordfish"
+
+/** Distinct words that both carry and already fit, in vocabulary order. */
+const fittingCarriers = async (limit: number): Promise<string[]> => {
+  const encoder = await createEncoder(SECRET, PASS, DURABLE_DENSITY, true)
+  const pool = await encoder.suggestFrom("", VOCAB, 6000, 0)
+  const out: string[] = []
+  for (const word of pool) {
+    if (isCarrierWord(await encoder.digestsFor(word))) out.push(word)
+    if (out.length >= limit) break
   }
-  return words.join(" ")
+  return out
 }
 
-describe("durable (edit-tolerant) mode", () => {
-  it("decodes, and survives words being deleted", async () => {
-    const secret = "DOCK AT 9"
-    const pass = "durable test"
-    const carrier = await buildDurable(secret, pass)
+describe("durable mode", () => {
+  it("round-trips through the real decoder", async () => {
+    const words = await fittingCarriers(90)
+    const result = await decode(words.join(" "), PASS)
+    expect(result.secret).toBe(SECRET)
+  }, 120_000)
 
-    expect((await decode(carrier, pass)).secret).toBe(secret)
+  it("survives deleted words, which is the whole point of durable mode", async () => {
+    const words = await fittingCarriers(90)
+    let text = words.join(" ")
+    for (let i = 0; i < 12; i++) {
+      const spans = tokenizeSpans(text)
+      const at = spans[Math.floor((i * 7 + 3) % spans.length)]
+      text = text.slice(0, at.start) + text.slice(at.end)
+    }
+    expect((await decode(text, PASS)).secret).toBe(SECRET)
+  }, 120_000)
 
-    // Delete a scattering of words — matrix embedding would break here.
-    const words = tokenize(carrier)
-    const kept = words.filter((_, i) => i % 17 !== 0)
-    const damaged = kept.join(" ")
-    expect(damaged.split(/\s+/).length).toBeLessThan(words.length)
-    expect((await decode(damaged, pass)).secret).toBe(secret)
-  }, 180_000)
+  it("stays wrong for the wrong passphrase", async () => {
+    const words = await fittingCarriers(90)
+    expect((await decode(words.join(" "), "wrong")).secret).toBeNull()
+  }, 120_000)
 
-  it("survives reordering, since clues are position-free", async () => {
-    const secret = "GO NOW"
-    const pass = "reorder test"
-    const carrier = await buildDurable(secret, pass)
-    const words = tokenize(carrier)
-    const shuffled = [...words].reverse().join(" ")
-    expect((await decode(shuffled, pass)).secret).toBe(secret)
-  }, 180_000)
-
-  it("does NOT survive words being altered — documents the real limit", async () => {
-    // A deleted word is a clean erasure. An ALTERED word is worse: it looks
-    // like a legitimate clue and contributes a false equation the decoder
-    // cannot identify without already knowing the payload. Asserting this so
-    // the limitation stays visible rather than being quietly assumed away.
-    const secret = "GO NOW"
-    const pass = "alter test"
-    const carrier = await buildDurable(secret, pass)
-    const words = tokenize(carrier)
-    const mangled = words
-      .map((w, i) => (i % 13 === 0 ? `${w}zzq` : w))
-      .join(" ")
-    expect((await decode(mangled, pass)).secret).not.toBe(secret)
+  it("needs far fewer distinct carriers than density 1 did", async () => {
+    // The regression that mattered: at density 1 this count was ~180 and
+    // unreachable in readable prose. Anything above ~120 means the generator
+    // is back to demanding a carrier no one would send.
+    const encoder = await createEncoder(SECRET, PASS, DURABLE_DENSITY, true)
+    const pool = await encoder.suggestFrom("", VOCAB, 6000, 0)
+    const carriers: string[] = []
+    for (const word of pool) {
+      if (isCarrierWord(await encoder.digestsFor(word))) carriers.push(word)
+      if (carriers.length >= 120) break
+    }
+    let needed = 0
+    for (const n of [40, 55, 70, 90, 120]) {
+      if ((await decode(carriers.slice(0, n).join(" "), PASS)).secret) {
+        needed = n
+        break
+      }
+    }
+    expect(needed).toBeGreaterThan(0)
+    expect(needed).toBeLessThanOrEqual(120)
   }, 180_000)
 })

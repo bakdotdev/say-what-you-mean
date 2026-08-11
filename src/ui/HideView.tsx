@@ -47,10 +47,7 @@ export function HideView({
   const durableGen = useDurableGenerator()
 
   const vocabulary = useVocabulary()
-  const freeWords = useFreeWords(
-    freeWrite && durable ? passphrase : "",
-    vocabulary,
-  )
+  const freeWords = useFreeWords(freeWrite && durable, vocabulary)
   const status = useMatrixPlan(secret, passphrase, carrier, locked)
   const durablePlan = useDurablePlan(secret, passphrase, carrier, durable)
   const spans = useMemo(() => tokenizeSpans(carrier), [carrier])

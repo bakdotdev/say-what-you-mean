@@ -32,7 +32,11 @@ const MODEL = "anthropic/claude-sonnet-5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
 const MIN_WORDS = 60
-const MAX_WORDS = 320
+/**
+ * Durable mode needs ~600+ words to hold the ~55 distinct carrier words a
+ * payload requires. 700 was measured as safe; 1200+ came back truncated.
+ */
+const MAX_WORDS = 800
 
 const RATE_CAPACITY = 8
 const RATE_WINDOW_MS = 60_000
@@ -116,7 +120,7 @@ export default async function handler(req, res) {
     MAX_WORDS,
     Math.max(MIN_WORDS, Number(body?.words) || 160),
   )
-  const topic = String(body?.topic ?? "an ordinary afternoon").slice(0, 80)
+  const topic = String(body?.topic ?? "an ordinary afternoon").slice(0, 160)
   // Optional allowed vocabulary — capped so the prompt stays sane.
   const allowedWords = Array.isArray(body?.allowed)
     ? body.allowed
@@ -134,7 +138,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1200,
+        max_tokens: 2000,
         temperature: 0.9,
         messages: [
           {

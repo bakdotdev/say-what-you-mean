@@ -43,6 +43,18 @@ const SHARED =
  * Exported so the legend can render swatches with these exact classes and stay
  * 1:1 with the text by construction, not by someone remembering to update it.
  */
+/**
+ * Hover per kind. A single shared hover broke locked words: dark ink text on
+ * a translucent amber wash is unreadable, so each state gets a hover that
+ * keeps its own contrast.
+ */
+export const MARK_HOVER: Record<Mark["kind"], string> = {
+  locked: "hover:bg-accent/80",
+  carrier: "hover:bg-accent/30",
+  required: "hover:bg-accent/20",
+  plain: "hover:bg-accent/15",
+}
+
 export const MARK_STYLES: Record<Mark["kind"], string> = {
   // Fills hug the glyphs exactly — no shadow spread, no padding — so a marked
   // word occupies the same box as an unmarked one and the backdrop stays in
@@ -187,7 +199,7 @@ function renderMarked(
         className={
           fill +
           (clickable
-            ? " pointer-events-auto cursor-pointer hover:bg-accent/30"
+            ? ` pointer-events-auto cursor-pointer ${MARK_HOVER[m.kind]}`
             : "")
         }
       >

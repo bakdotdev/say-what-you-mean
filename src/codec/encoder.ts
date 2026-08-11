@@ -42,6 +42,25 @@ export const DENSITY_PRESETS = {
 
 export type DensityName = keyof typeof DENSITY_PRESETS
 
+/**
+ * Density used by durable (per-word) mode, everywhere.
+ *
+ * Measured against the REAL decoder for a 74-bit payload — never against
+ * `evaluate().solved`, which ignores the contradictions that non-fitting
+ * carriers feed the decoder. This is how many DISTINCT fitting carrier words
+ * the text must contain:
+ *   density 1 → ~180        density 2 → 55-90        density 3 → ~56
+ * The spread within a density is word diversity: varied prose reaches it
+ * sooner than words taken in vocabulary order.
+ *
+ * Ordinary prose yields roughly one distinct carrier per ten words, so
+ * density 1 needed a ~1800-word carrier and could never converge. Density 2
+ * needs ~600-900 words, and it holds a much larger pool of fitting
+ * replacements than density 3 (477 vs 221 words from the same band), so
+ * repairs read more naturally.
+ */
+export const DURABLE_DENSITY = 2
+
 export interface WordReport {
   word: string
   /** Fraction of this word's active equations satisfied (0..1). */

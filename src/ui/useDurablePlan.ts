@@ -13,7 +13,12 @@
  * Trade: roughly double the carrier length for the same secret.
  */
 import { useEffect, useRef, useState } from "react"
-import { createEncoder, tokenizeSpans, type EncodeState } from "../codec"
+import {
+  createEncoder,
+  DURABLE_DENSITY,
+  tokenizeSpans,
+  type EncodeState,
+} from "../codec"
 
 export interface DurableStatus {
   state: EncodeState | null
@@ -48,9 +53,12 @@ export function useDurablePlan(
     setStatus((s) => ({ ...s, busy: true }))
     const timer = setTimeout(async () => {
       try {
-        // Density 1 keeps ~50% of words usable, which is the most forgiving
-        // setting — the generator has to replace the fewest words.
-        const encoder = await createEncoder(secret, passphrase, 1, true)
+        const encoder = await createEncoder(
+          secret,
+          passphrase,
+          DURABLE_DENSITY,
+          true,
+        )
         const state = await encoder.evaluate(carrier)
         if (runId.current !== id) return
         const unfit = state.words
