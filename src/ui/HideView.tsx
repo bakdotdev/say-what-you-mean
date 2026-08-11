@@ -25,7 +25,13 @@ import { useCarrierGenerator } from "./useCarrierGenerator"
 import { useDurableGenerator } from "./useDurableGenerator"
 import { useDurablePlan } from "./useDurablePlan"
 
-export function HideView() {
+export function HideView({
+  durable,
+  onDurableChange,
+}: {
+  durable: boolean
+  onDurableChange: (durable: boolean) => void
+}) {
   const [secret, setSecret] = useState("")
   const [passphrase, setPassphrase] = useState("")
   const [carrier, setCarrier] = useState("")
@@ -36,7 +42,6 @@ export function HideView() {
   const ai = useAiRewrite()
   const generator = useCarrierGenerator()
   const durableGen = useDurableGenerator()
-  const [durable, setDurable] = useState(false)
 
   const vocabulary = useVocabulary()
   const status = useMatrixPlan(secret, passphrase, carrier, locked)
@@ -146,7 +151,7 @@ export function HideView() {
         ).map((opt, i) => (
           <button
             key={opt.label}
-            onClick={() => setDurable(opt.id)}
+            onClick={() => onDurableChange(opt.id)}
             aria-pressed={durable === opt.id}
             className={
               "flex-1 px-2 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors " +

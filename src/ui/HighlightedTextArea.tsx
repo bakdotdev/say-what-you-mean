@@ -43,8 +43,8 @@ const SHARED =
  * 1:1 with the text by construction, not by someone remembering to update it.
  */
 export const MARK_STYLES: Record<Mark["kind"], string> = {
-  locked: "rounded bg-accent/45 shadow-[0_0_0_3px] shadow-accent/45",
-  carrier: "rounded bg-accent/15 shadow-[0_0_0_3px] shadow-accent/15",
+  locked: "bg-accent/45 shadow-[0_0_0_3px] shadow-accent/45",
+  carrier: "bg-accent/15 shadow-[0_0_0_3px] shadow-accent/15",
   plain: "",
 }
 
@@ -145,7 +145,7 @@ function renderMarked(
         className={
           fill +
           (clickable
-            ? " pointer-events-auto cursor-pointer rounded hover:bg-accent/30"
+            ? " pointer-events-auto cursor-pointer hover:bg-accent/30"
             : "")
         }
       >

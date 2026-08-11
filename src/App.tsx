@@ -17,7 +17,14 @@ const VERSIONS: { id: "v1" | "v2"; label: string; blurb: string }[] = [
 ]
 
 export function App() {
-  const { version, mode: tab, setVersion, setMode: setTab } = useUrlState()
+  const {
+    version,
+    mode: tab,
+    encoding,
+    setVersion,
+    setMode: setTab,
+    setEncoding,
+  } = useUrlState()
 
   const tabs = (
     <div
@@ -89,7 +96,10 @@ export function App() {
         <section aria-live="polite">
           {version === "v1" ? (
             tab === "hide" ? (
-              <HideView />
+              <HideView
+                durable={encoding === "durable"}
+                onDurableChange={(d) => setEncoding(d ? "durable" : "compact")}
+              />
             ) : (
               <RevealView />
             )
