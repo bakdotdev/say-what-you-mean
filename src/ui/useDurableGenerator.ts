@@ -39,8 +39,13 @@ const COMMON_BAND = 9000
 /** Words per run. Short runs hold the vocabulary far better than long ones. */
 const RUN_WORDS = 300
 const MAX_RUNS = 8
-/** Keep a sentence only if at most this fraction of its words need changing. */
-const MAX_STRAY_RATIO = 0.5
+/**
+ * Keep a sentence if at most this many of its CARRIER words need changing.
+ * Judging by overall stray ratio was the bug: junk words dominate a sentence,
+ * so a low ratio said nothing about whether the carriers actually fit, and the
+ * harvest could gather 800+ words that still could not cover the payload.
+ */
+const MAX_STRAY_CARRIERS = 1
 const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 
@@ -159,7 +164,9 @@ export function useDurableGenerator() {
               carriers++
               if (!allowedSet.has(w)) strays++
             }
-            if (carriers === 0 || strays / carriers <= MAX_STRAY_RATIO) {
+            // A sentence with no carriers is pure filler: pleasant to read but
+            // it moves nothing, so it only adds length.
+            if (carriers > 0 && strays <= MAX_STRAY_CARRIERS) {
               kept.push({ sentence, strays })
             }
           }
@@ -175,8 +182,14 @@ export function useDurableGenerator() {
           // cover the payload with headroom.
           const raw = kept.map((k) => k.sentence).join(" ")
           const rawState = await encoder.evaluate(raw)
-          const carrierCount = rawState.words.filter((w) => !w.junk).length
-          if (carrierCount < payloadBits * 1.15) continue
+          if (rawState.solved) {
+            setState({ busy: false, stage: "", error: null })
+            return raw
+          }
+          // Coverage, not word count, is what decides whether repair can
+          // finish: determinedBits is how much of the payload the fitting
+          // carriers already pin down. Repairing before that is wasted work.
+          if (rawState.determinedBits < payloadBits * 0.85) continue
 
           setState({ busy: true, stage: "fitting words…", error: null })
           const candidate = await repair(

@@ -119,8 +119,19 @@ export function HighlightedTextArea({
       {busyLabel && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-panel/85 px-4 text-center">
           <span className="text-[11px] uppercase tracking-[0.2em] text-fg">
-            <span className="mr-2 inline-block animate-pulse">▓</span>
-            {busyLabel}
+            {busyLabel.replace(/…$/, "")}
+            {/* Dots animate in sequence rather than the whole line pulsing. */}
+            <span className="inline-flex">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="animate-bounce"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                >
+                  .
+                </span>
+              ))}
+            </span>
           </span>
         </div>
       )}

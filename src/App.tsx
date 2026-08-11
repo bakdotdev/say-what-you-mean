@@ -7,8 +7,8 @@ import { PageEffect } from "./ui/PageEffect"
 
 
 const TABS: { id: "hide" | "reveal"; label: string; glyph: string }[] = [
-  { id: "hide", label: "hide", glyph: "▚" },
-  { id: "reveal", label: "reveal", glyph: "▞" },
+  { id: "hide", label: "hide message", glyph: "▚" },
+  { id: "reveal", label: "reveal message", glyph: "▞" },
 ]
 
 const VERSIONS: { id: "v1" | "v2"; label: string; blurb: string }[] = [
