@@ -6,14 +6,17 @@
  * paragraph with words chosen by constraint rather than meaning leaves
  * grammatical nonsense.
  *
- * This harvests instead of repairing. Per-word embedding is position-free — a
- * fitting word carries the same clue wherever it sits — so sentences can be
- * concatenated freely. We generate in short runs, keep only the sentences
- * where EVERY word already fits, and accumulate until the payload is covered.
- * Nothing is substituted, so every sentence in the result is exactly as the
- * model wrote it.
+ * This harvests instead. Per-word embedding is position-free — a fitting word
+ * carries the same clue wherever it sits — so sentences concatenate freely.
+ * We generate in short runs and keep the sentences that ALREADY fit best,
+ * repairing only their handful of stray words.
  *
- * Mechanical repair survives only as a last resort, if harvesting stalls.
+ * Demanding perfectly clean sentences does not work: at ~70% word adherence a
+ * twelve-word sentence is fully clean about 1% of the time, and eight runs
+ * yielded none. But sentences with one or two strays are common, and fixing
+ * one word barely dents readability — where swapping 30% of a paragraph
+ * destroys it. So we rank by how little repair a sentence needs and take the
+ * cleanest.
  */
 import { useCallback, useState } from "react"
 import { createEncoder, tokenizeSpans, type Encoder } from "../codec"
@@ -30,6 +33,8 @@ const COMMON_BAND = 7000
 /** Words per run. Short runs hold the vocabulary far better than long ones. */
 const RUN_WORDS = 300
 const MAX_RUNS = 8
+/** Keep a sentence only if at most this fraction of its words need changing. */
+const MAX_STRAY_RATIO = 0.2
 const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 
@@ -82,7 +87,7 @@ export function useDurableGenerator() {
         )
         const allowedSet = new Set(allowed)
 
-        const kept: string[] = []
+        const kept: { sentence: string; strays: number }[] = []
 
         for (let run = 1; run <= MAX_RUNS; run++) {
           setState({
@@ -114,15 +119,20 @@ export function useDurableGenerator() {
           const { carrier } = (await res.json()) as { carrier?: string }
           if (!carrier) continue
 
-          // Keep only sentences whose every word already fits — no edits.
+          // Keep the sentences needing least repair; discard the rest.
           for (const sentence of sentencesOf(carrier)) {
             const words = tokenizeSpans(sentence).map((s) => s.word)
-            if (words.length < 3) continue
-            if (words.every((w) => allowedSet.has(w))) kept.push(sentence)
+            if (words.length < 4) continue
+            const strays = words.filter((w) => !allowedSet.has(w)).length
+            if (strays / words.length <= MAX_STRAY_RATIO) {
+              kept.push({ sentence, strays })
+            }
           }
           if (kept.length === 0) continue
+          // Cleanest first, so the least-repaired text leads.
+          kept.sort((a, b) => a.strays - b.strays)
 
-          const candidate = kept.join(" ")
+          const candidate = kept.map((k) => k.sentence).join(" ")
           if ((await encoder.evaluate(candidate)).solved) {
             setState({ busy: false, stage: "", error: null })
             return candidate
@@ -138,11 +148,11 @@ export function useDurableGenerator() {
           return null
         }
 
-        // Harvest stalled: repair what we have. Reads worse, but carries.
-        setState({ busy: true, stage: "fitting the remainder…", error: null })
+        // Repair the few strays inside the sentences we kept.
+        setState({ busy: true, stage: "fitting the last few words…", error: null })
         const repaired = await repair(
           encoder,
-          kept.join(" "),
+          kept.map((k) => k.sentence).join(" "),
           vocabulary,
           `${base}api/rewrite`,
         )
