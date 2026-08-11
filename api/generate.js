@@ -24,7 +24,7 @@ const RATE_CAPACITY = 8
 const RATE_WINDOW_MS = 60_000
 const buckets = new Map()
 
-const allowed = (ip) => {
+const withinRateLimit = (ip) => {
   const now = Date.now()
   const bucket = buckets.get(ip)
   if (!bucket || now - bucket.start > RATE_WINDOW_MS) {
@@ -81,7 +81,8 @@ export default async function handler(req) {
   if (!originAllowed(req)) return json({ error: "forbidden" }, 403)
 
   const ip = clientIp(req)
-  if (!allowed(ip)) return json({ error: "rate limited — try again shortly" }, 429)
+  if (!withinRateLimit(ip))
+    return json({ error: "rate limited — try again shortly" }, 429)
 
   const key = process.env.AI_GATEWAY_API_KEY
   if (!key) return json({ error: "AI_GATEWAY_API_KEY not configured" }, 500)
@@ -99,7 +100,7 @@ export default async function handler(req) {
   )
   const topic = String(body?.topic ?? "an ordinary afternoon").slice(0, 80)
   // Optional allowed vocabulary — capped so the prompt stays sane.
-  const allowed = Array.isArray(body?.allowed)
+  const allowedWords = Array.isArray(body?.allowed)
     ? body.allowed
         .slice(0, 900)
         .map((w) => String(w).slice(0, 24))
@@ -120,12 +121,12 @@ export default async function handler(req) {
         messages: [
           {
             role: "system",
-            content: allowed.length ? VOCAB_SYSTEM : SYSTEM,
+            content: allowedWords.length ? VOCAB_SYSTEM : SYSTEM,
           },
           {
             role: "user",
-            content: allowed.length
-              ? `Allowed words (use only these):\n${allowed.join(" ")}\n\nWrite about ${topic}. Aim for roughly ${words} words — better slightly long than short.`
+            content: allowedWords.length
+              ? `Allowed words (use only these):\n${allowedWords.join(" ")}\n\nWrite about ${topic}. Aim for roughly ${words} words — better slightly long than short.`
               : `Write about ${topic}. Aim for roughly ${words} words — it is better to run slightly long than short.`,
           },
         ],
