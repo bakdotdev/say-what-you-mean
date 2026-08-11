@@ -22,7 +22,7 @@ const hasContent = (node: ReactNode): boolean => {
   if (typeof node === "number") return true
   if (Array.isArray(node)) return node.some(hasContent)
   if (isValidElement(node)) {
-    if (node.type === FRAGMENT) {
+    if ((node.type as unknown) === FRAGMENT) {
       return hasContent((node.props as { children?: ReactNode })?.children)
     }
     return true
