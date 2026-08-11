@@ -50,15 +50,25 @@ export function HideView() {
   const lockedSet = useMemo(() => new Set(locked), [locked])
 
   // Box locked words solidly and to-be-swapped words dimly, in place.
+  // Every word is a target so any of them can be locked; only the meaningful
+  // ones carry a fill.
   const marks: Mark[] = useMemo(
     () =>
-      spans.flatMap<Mark>((span, i) => {
-        if (lockedSet.has(i))
-          return [{ start: span.start, end: span.end, kind: "locked" }]
-        if (flipSet.has(i))
-          return [{ start: span.start, end: span.end, kind: "carrier" }]
-        return []
-      }),
+      spans.map<Mark>((span, i) => ({
+        start: span.start,
+        end: span.end,
+        slot: i,
+        kind: lockedSet.has(i)
+          ? "locked"
+          : flipSet.has(i)
+            ? "carrier"
+            : "plain",
+        title: lockedSet.has(i)
+          ? "locked — click to unlock"
+          : flipSet.has(i)
+            ? "being changed — click to lock it"
+            : "click to lock",
+      })),
     [spans, flipSet, lockedSet],
   )
 
@@ -234,10 +244,11 @@ export function HideView() {
         }
         disabled={!ready}
         ariaLabel="Carrier text"
+        onWordClick={toggleLock}
       />
       </div>
       <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-        // shaded = being changed · solid = locked by you · click any word to lock it
+        // click any word to lock it · shaded = being changed · solid = locked
       </p>
       <Button
         variant={embedded ? "ready" : "ghost"}
@@ -321,52 +332,6 @@ export function HideView() {
     </Panel>
   ) : null
 
-  const wordPanel =
-    ready && spans.length > 0 ? (
-      <Panel
-        title="word map"
-        right={
-          <span className="text-[10px] tracking-wider text-muted">
-            click to lock
-          </span>
-        }
-      >
-        <div className="flex flex-wrap gap-1">
-          {spans.map((span, i) => {
-            const isLocked = lockedSet.has(i)
-            const isFlip = flipSet.has(i)
-            return (
-              <button
-                key={i}
-                onClick={(e) => {
-                  if (e.altKey || e.shiftKey || isLocked) toggleLock(i)
-                  else if (isFlip) setPicking(i)
-                  else toggleLock(i)
-                }}
-                title={
-                  isLocked
-                    ? "locked — never swapped"
-                    : isFlip
-                      ? "needs swapping"
-                      : "kept as written"
-                }
-                className={
-                  "border px-1.5 py-0.5 text-xs normal-case text-fg transition-opacity " +
-                  (isLocked
-                    ? "border-fg bg-accent/25 opacity-100"
-                    : isFlip
-                      ? "border-fg/50 bg-accent/10 opacity-100"
-                      : "border-fg/20 opacity-20 hover:opacity-50")
-                }
-              >
-                {span.word}
-              </button>
-            )
-          })}
-        </div>
-      </Panel>
-    ) : null
-
   return (
     <Columns
       left={encodingPanel}
@@ -374,7 +339,6 @@ export function HideView() {
         <>
           {payloadPanel}
           {carrierPanel}
-          {wordPanel}
           <About />
         </>
       }
