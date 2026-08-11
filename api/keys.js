@@ -6,26 +6,25 @@
  * fetches it once; the server deletes it immediately afterwards.
  *
  * What the server can and cannot see:
- *   lookupId = HMAC(passphrase, digest(carrier words))   computed client-side
- *   blob     = secret XOR HKDF(passphrase, digest)        computed client-side
+ *   lookupId = HMAC(mac key, digest(carrier words))   computed client-side
+ *   blob     = secret XOR HKDF(passphrase, digest)    computed client-side
  *
  * The id is a hash the server cannot invert, and the blob is a one-time-pad
  * ciphertext whose pad depends on both the exact words and the passphrase.
- * Neither the id nor the blob reveals the message, and the server never
- * receives the passphrase or the carrier text.
+ * Neither reveals the message, and the server never receives the passphrase
+ * or the carrier text.
  *
  * Storage is a PRIVATE Vercel Blob store, so objects are not publicly
  * addressable even before deletion.
+ *
+ * Runtime note: this must be a Node.js function — @vercel/blob depends on Node
+ * built-ins that the edge runtime does not provide. That means the handler
+ * takes (req, res), NOT the Web Request/Response signature.
  *
  * Caveat worth stating: blobs that are never read are not auto-expired here.
  * A sweeper (or a store lifecycle rule) should clear stale keys.
  */
 import { put, get, del } from "@vercel/blob"
-
-// Edge runtime: this handler uses the Web Request/Response signature. Without
-// this the function runs as Node.js, where `req` is an IncomingMessage whose
-// `url` is a bare path — and `new URL(path)` throws "Invalid URL".
-export const config = { runtime: "edge" }
 
 const PREFIX = "swym/keys"
 const MAX_BLOB_CHARS = 512
@@ -33,26 +32,19 @@ const MAX_BLOB_CHARS = 512
 // Ids are client-computed hex digests; never trust them as paths.
 const validId = (id) => typeof id === "string" && /^[0-9a-f]{32,64}$/.test(id)
 
-const json = (value, status = 200) =>
-  new Response(JSON.stringify(value), {
-    status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
-  })
+const describe = (err) =>
+  err instanceof Error ? err.message : "storage request failed"
 
-export default async function handler(req) {
-  const url = new URL(req.url)
+export default async function handler(req, res) {
+  res.setHeader("cache-control", "no-store")
 
   if (req.method === "POST") {
-    let body
-    try {
-      body = await req.json()
-    } catch {
-      return json({ error: "invalid json" }, 400)
-    }
-    const { id, blob } = body ?? {}
-    if (!validId(id)) return json({ error: "invalid id" }, 400)
+    const body =
+      typeof req.body === "string" ? safeParse(req.body) : (req.body ?? {})
+    const { id, blob } = body
+    if (!validId(id)) return res.status(400).json({ error: "invalid id" })
     if (typeof blob !== "string" || !blob || blob.length > MAX_BLOB_CHARS) {
-      return json({ error: "invalid blob" }, 400)
+      return res.status(400).json({ error: "invalid blob" })
     }
     try {
       await put(`${PREFIX}/${id}`, blob, {
@@ -61,21 +53,21 @@ export default async function handler(req) {
         allowOverwrite: true,
         contentType: "text/plain",
       })
-      return json({ stored: true })
+      return res.status(200).json({ stored: true })
     } catch (err) {
-      return json({ error: describe(err) }, 502)
+      return res.status(502).json({ error: describe(err) })
     }
   }
 
   if (req.method === "GET") {
-    const id = url.searchParams.get("id")
-    if (!validId(id)) return json({ error: "invalid id" }, 400)
+    const id = req.query?.id
+    if (!validId(id)) return res.status(400).json({ error: "invalid id" })
     const pathname = `${PREFIX}/${id}`
     try {
       const result = await get(pathname, { access: "private" })
-      if (!result) return json({ error: "not found" }, 404)
+      if (!result) return res.status(404).json({ error: "not found" })
 
-      const blob = await new Response(result.stream).text()
+      const blob = await streamToString(result.stream)
 
       // Burn after reading: the key exists for exactly one retrieval.
       try {
@@ -84,14 +76,38 @@ export default async function handler(req) {
         // A failed delete must not withhold the message from the recipient.
       }
 
-      return json({ blob })
+      return res.status(200).json({ blob })
     } catch (err) {
-      return json({ error: describe(err) }, 502)
+      return res.status(502).json({ error: describe(err) })
     }
   }
 
-  return json({ error: "method not allowed" }, 405)
+  return res.status(405).json({ error: "method not allowed" })
 }
 
-const describe = (err) =>
-  err instanceof Error ? err.message : "storage request failed"
+const safeParse = (text) => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {}
+  }
+}
+
+const streamToString = async (stream) => {
+  if (!stream) return ""
+  // Web ReadableStream (what @vercel/blob returns) — read it fully.
+  if (typeof stream.getReader === "function") {
+    const chunks = []
+    const reader = stream.getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(typeof value === "string" ? value : Buffer.from(value))
+    }
+    return chunks.map((c) => c.toString()).join("")
+  }
+  // Node stream fallback.
+  const parts = []
+  for await (const chunk of stream) parts.push(Buffer.from(chunk))
+  return Buffer.concat(parts).toString("utf8")
+}
