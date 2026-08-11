@@ -1,13 +1,15 @@
 import { useState } from "react"
 import { HideView } from "./ui/HideView"
 import { RevealView } from "./ui/RevealView"
+import { BindView } from "./ui/BindView"
 import { PageEffect } from "./ui/PageEffect"
 
-type Tab = "hide" | "reveal"
+type Tab = "hide" | "reveal" | "bind"
 
 const TABS: { id: Tab; label: string; glyph: string }[] = [
   { id: "hide", label: "hide", glyph: "▚" },
   { id: "reveal", label: "reveal", glyph: "▞" },
+  { id: "bind", label: "v2 · bind", glyph: "▜" },
 ]
 
 export function App() {
@@ -58,7 +60,13 @@ export function App() {
         <div className="mb-3">{tabs}</div>
 
         <section aria-live="polite">
-          {tab === "hide" ? <HideView /> : <RevealView />}
+          {tab === "hide" ? (
+            <HideView />
+          ) : tab === "reveal" ? (
+            <RevealView />
+          ) : (
+            <BindView />
+          )}
         </section>
       </main>
     </PageEffect>
