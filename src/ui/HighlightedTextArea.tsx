@@ -100,7 +100,10 @@ export function HighlightedTextArea({
       <div
         ref={backRef}
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 z-10 overflow-hidden text-transparent ${SHARED}`}
+        // normal-case matters: the app shell sets `uppercase`, and required
+        // words now render visible text from THIS layer, so without it they
+        // would shout in caps while the textarea below stays lowercase.
+        className={`pointer-events-none absolute inset-0 z-10 overflow-hidden normal-case text-transparent ${SHARED}`}
       >
         {renderMarked(value, marks, onWordClick)}
       </div>

@@ -85,10 +85,26 @@ describe("function words are never used for decryption", () => {
 
   it("never marks a function word as a carrier", async () => {
     const keys = await deriveKeys("function words")
-    for (const w of ["the", "and", "is", "of", "to", "a", "my", "was", "it"]) {
-      expect(isCarrierWord(await wordDigests(w, keys))).toBe(false)
+    const samples = [
+      // determiners, pronouns, prepositions, conjunctions, auxiliaries,
+      // modals, negation, quantity, contractions
+      "the", "a", "an", "this", "these",
+      "i", "you", "us", "it", "they", "himself",
+      "of", "to", "at", "in", "with", "between", "despite",
+      "and", "so", "but", "because", "although", "however",
+      "is", "was", "been", "having", "does",
+      "will", "should", "might",
+      "not", "never", "anything", "everyone",
+      "more", "very", "just", "quite",
+      "it's", "don't", "we're", "can't",
+    ]
+    for (const w of samples) {
+      expect(
+        isCarrierWord(await wordDigests(w, keys)),
+        `"${w}" should never be required`,
+      ).toBe(false)
     }
-  }, 60_000)
+  }, 120_000)
 
   it("leaves most of a real paragraph unconstrained", async () => {
     const keys = await deriveKeys("real prose")

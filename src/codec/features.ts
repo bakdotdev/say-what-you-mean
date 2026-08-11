@@ -109,20 +109,47 @@ export const featuresOf = (
  */
 export const FUNCTION_WORDS: ReadonlySet<string> = new Set(
   (
+    // Articles and determiners
     "a an the this that these those my your his her its our their whose " +
-    "i me you he him she it we us they them who whom which what " +
-    "am is are was were be been being do does did doing done have has had having " +
-    "will would shall should can could may might must ought " +
-    "and or but nor so yet for because although though while whereas since unless until " +
-    "if then than as when where why how whether either neither both " +
-    "of to in on at by from with without within into onto upon over under " +
-    "above below between among through during before after against about across " +
-    "around behind beside besides beyond down off out past toward towards up " +
-    "not no nor never none nothing nobody nowhere any anyone anything some someone " +
-    "something every everyone everything each all most more much many few fewer less " +
-    "least little other others another same such own very too also just only even " +
-    "there here now then once again still yet always often sometimes rarely " +
-    "one two three first next last new old good great well back way day time year " +
+    "each every either neither both all any some no none such another " +
+    "other others same enough several various certain " +
+    // Pronouns, including reflexives and possessives
+    "i me mine myself you your yours yourself yourselves he him his " +
+    "himself she her hers herself it its itself we us our ours ourselves " +
+    "they them their theirs themselves who whom whose which what one " +
+    "oneself whatever whoever whomever whichever " +
+    // Be, have and do in every form — auxiliaries, not content
+    "am is are was were be been being do does did doing done have has " +
+    "had having " +
+    // Modals
+    "will would shall should can could may might must ought need dare " +
+    // Conjunctions, coordinating and subordinating
+    "and or but nor for yet so because although though while whereas " +
+    "since unless until till if whether than as when whenever where " +
+    "wherever why how however therefore moreover otherwise meanwhile " +
+    "besides nevertheless nonetheless furthermore thus hence albeit lest " +
+    // Prepositions
+    "of to in on at by from with without within into onto upon over " +
+    "under above below beneath underneath between among amongst through " +
+    "throughout during before after against about across around behind " +
+    "beside beyond down off out outside inside past toward towards up " +
+    "via versus despite except regarding concerning considering following " +
+    "per plus minus near next opposite along alongside amid amidst atop " +
+    // Negation, quantity and degree
+    "not never nothing nobody nowhere anything anyone anybody anywhere " +
+    "something someone somebody somewhere everything everyone everybody " +
+    "everywhere more most much many few fewer less least little very too " +
+    "also just only even still again once always often sometimes rarely " +
+    "seldom quite rather really almost nearly hardly barely scarcely " +
+    "indeed perhaps maybe anyway there here now then " +
+    // Contractions — the tokenizer keeps apostrophes, so these are tokens
+    "i'm i've i'll i'd you're you've you'll you'd he's he'll he'd she's " +
+    "she'll she'd it's it'll we're we've we'll we'd they're they've " +
+    "they'll they'd that's there's here's what's who's let's isn't " +
+    "aren't wasn't weren't don't doesn't didn't won't wouldn't can't " +
+    "cannot couldn't shouldn't shan't mustn't haven't hasn't hadn't " +
+    "ain't " +
+    // Clitics other tokenizers leave behind
     "s t re ve ll d m"
   ).split(" "),
 )
