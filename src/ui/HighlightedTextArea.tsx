@@ -49,9 +49,13 @@ export const MARK_STYLES: Record<Mark["kind"], string> = {
   // register with the textarea.
   locked: "bg-accent/45",
   carrier: "bg-accent/15",
-  // Outline only: these words are already doing their job, so they read as
-  // marked-but-settled rather than competing with the fills.
-  required: "outline outline-1 -outline-offset-1 outline-accent/25",
+  /**
+   * Solid amber with dark text. The backdrop sits ABOVE the textarea, so an
+   * opaque fill hides the amber glyph underneath and this span's own dark
+   * text renders on top — which is why `text-ink` must override the layer's
+   * inherited `text-transparent`.
+   */
+  required: "bg-accent text-ink",
   plain: "",
 }
 
