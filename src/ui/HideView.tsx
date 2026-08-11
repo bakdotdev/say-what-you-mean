@@ -11,6 +11,8 @@ import { useVocabulary } from "./useWordlist"
 import { Button, Field, Meter, Panel, Tag, TextInput } from "./primitives"
 import { HighlightedTextArea, type Mark } from "./HighlightedTextArea"
 import { WordInspector } from "./WordInspector"
+import { Columns } from "./Columns"
+import { About } from "./About"
 
 const DENSITY_LABELS: Record<number, { name: string; blurb: string }> = {
   1: { name: "FREEST", blurb: "~50% of words fit · longest carrier" },
@@ -19,7 +21,7 @@ const DENSITY_LABELS: Record<number, { name: string; blurb: string }> = {
   4: { name: "TIGHTEST", blurb: "~6% of words fit · shortest carrier" },
 }
 
-export function HideView() {
+export function HideView({ tabs }: { tabs: React.ReactNode }) {
   const [secret, setSecret] = useState("")
   const [passphrase, setPassphrase] = useState("")
   const [carrier, setCarrier] = useState("")
@@ -94,9 +96,7 @@ export function HideView() {
   const solved = state?.solved ?? false
   const info = DENSITY_LABELS[density]
 
-  return (
-    <div className="space-y-3">
-      {/* 1. Encoding parameters */}
+  const encodingPanel = (
       <Panel
         title="encoding"
         right={
@@ -144,8 +144,9 @@ export function HideView() {
           ))}
         </div>
       </Panel>
+  )
 
-      {/* 2. Inputs, below the slider */}
+  const payloadPanel = (
       <Panel title="payload">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
@@ -170,8 +171,9 @@ export function HideView() {
           </Field>
         </div>
       </Panel>
+  )
 
-      {/* 3. Carrier composition */}
+  const carrierPanel = (
       <Panel
         title="carrier"
         right={
@@ -199,14 +201,16 @@ export function HideView() {
           ariaLabel="Carrier text"
         />
       </Panel>
+  )
 
-      {error && (
-        <p className="border border-fg/50 bg-accent/10 px-3 py-2 text-xs text-fg">
-          {error}
-        </p>
-      )}
+  const errorPanel = error ? (
+    <p className="border border-fg/50 bg-accent/10 px-3 py-2 text-xs text-fg">
+      {error}
+    </p>
+  ) : null
 
-      {ready && state && (
+  const analysis =
+    ready && state ? (
         <>
           <StatusPanel
             solved={solved}
@@ -275,19 +279,37 @@ export function HideView() {
             </Panel>
           )}
 
-          <div className="flex items-center gap-3">
-            <Button onClick={copy} disabled={!solved}>
+          <div className="space-y-1.5">
+            <Button onClick={copy} disabled={!solved} className="w-full">
               {copied ? "copied ✓" : "copy carrier"}
             </Button>
             {!solved && (
-              <span className="text-[10px] tracking-wider text-muted">
+              <span className="block text-[10px] leading-relaxed tracking-wider text-muted">
                 locked until payload is fully embedded
               </span>
             )}
           </div>
         </>
-      )}
-    </div>
+    ) : null
+
+  return (
+    <Columns
+      left={
+        <>
+          {tabs}
+          {encodingPanel}
+        </>
+      }
+      center={
+        <>
+          {payloadPanel}
+          {carrierPanel}
+          {errorPanel}
+          <About />
+        </>
+      }
+      right={analysis}
+    />
   )
 }
 

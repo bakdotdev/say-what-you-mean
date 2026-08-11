@@ -121,6 +121,15 @@ type ElementImageContext = CanvasRenderingContext2D & {
   drawElementImage?: (element: Element, x: number, y: number) => void;
 };
 
+/**
+ * Chrome's shipping HTML-in-Canvas origin trial (148-150) exposes
+ * `element.layoutSubtree()` + `ctx.drawElementImage()`. An earlier iteration
+ * of the proposal also had `canvas.onpaint` / `canvas.requestPaint()`, which
+ * this component was written against. We support BOTH: if requestPaint is
+ * absent we drive the paint ourselves each frame.
+ */
+type LayoutableElement = Element & { layoutSubtree?: () => void };
+
 const VERT = `#version 300 es
 precision highp float;
 layout(location = 0) in vec2 aPos;
@@ -492,11 +501,7 @@ export function supportsHtmlInCanvas(): boolean {
   if (typeof document === "undefined") return false;
   const probe = document.createElement("canvas") as PaintableCanvas;
   const ctx = probe.getContext("2d") as ElementImageContext | null;
-  return Boolean(
-    ctx &&
-    typeof ctx.drawElementImage === "function" &&
-    typeof probe.requestPaint === "function",
-  );
+  return Boolean(ctx && typeof ctx.drawElementImage === "function");
 }
 
 export function createDecryptReveal(
@@ -519,13 +524,28 @@ export function createDecryptReveal(
   const paintable = source as PaintableCanvas;
   const htmlInCanvas = Boolean(
     sourceCtx &&
-    typeof sourceCtx.drawElementImage === "function" &&
-    typeof paintable.requestPaint === "function",
+    typeof sourceCtx.drawElementImage === "function",
   );
 
   let contentDirty = false;
   let cellsDirty = true;
   let wake = () => {};
+
+  /**
+   * Shipping-API paint path: lay out the live DOM subtree and draw it into the
+   * source canvas ourselves. Used when `canvas.requestPaint` is unavailable
+   * (Chrome 148-150 origin trial), where the older onpaint callback never fires.
+   */
+  const usesRequestPaint = typeof paintable.requestPaint === "function";
+  function pumpContent() {
+    if (!htmlInCanvas) return;
+    try {
+      (content as LayoutableElement).layoutSubtree?.();
+      sourceCtx!.reset();
+      sourceCtx!.drawElementImage!(content, 0, 0);
+      contentDirty = true;
+    } catch {}
+  }
 
   if (htmlInCanvas) {
     paintable.onpaint = () => {
@@ -724,7 +744,11 @@ export function createDecryptReveal(
         source.width = cssWidth * dpr;
         source.height = cssHeight * dpr;
       }
-      paintable.requestPaint!();
+      if (typeof paintable.requestPaint === "function") {
+        paintable.requestPaint();
+      } else {
+        pumpContent();
+      }
     }
     cellsDirty = true;
   }
@@ -907,6 +931,7 @@ export function createDecryptReveal(
     pointer.x += (pointer.tx - pointer.x) * k;
     pointer.y += (pointer.ty - pointer.y) * k;
     pointer.active += (pointer.target - pointer.active) * k;
+    if (htmlInCanvas && !usesRequestPaint) pumpContent();
     render();
     const settled =
       Math.abs(pointer.tx - pointer.x) < 0.1 &&

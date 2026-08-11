@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react"
 import { decode, type DecodeResult } from "../codec"
 import { Field, Panel, Tag, TextArea, TextInput } from "./primitives"
 import { RevealOutput } from "./RevealOutput"
+import { Columns } from "./Columns"
+import { About } from "./About"
 
-export function RevealView() {
+export function RevealView({ tabs }: { tabs: React.ReactNode }) {
   const [carrier, setCarrier] = useState("")
   const [passphrase, setPassphrase] = useState("")
   const [result, setResult] = useState<DecodeResult | null>(null)
@@ -31,8 +33,7 @@ export function RevealView() {
 
   const found = result?.secret != null
 
-  return (
-    <div className="space-y-3">
+  const carrierPanel = (
       <Panel title="received carrier">
         <TextArea
           value={carrier}
@@ -43,7 +44,9 @@ export function RevealView() {
           aria-label="Received carrier text"
         />
       </Panel>
+  )
 
+  const keyPanel = (
       <Panel title="key">
         <Field label="shared passphrase">
           <TextInput
@@ -55,12 +58,14 @@ export function RevealView() {
           />
         </Field>
       </Panel>
+  )
 
-      {busy && !result && (
-        <p className="text-[10px] tracking-[0.2em] text-muted">// decoding…</p>
-      )}
+  const busyLine =
+    busy && !result ? (
+      <p className="text-[10px] tracking-[0.2em] text-muted">// decoding…</p>
+    ) : null
 
-      {result && (
+  const outputPanel = result ? (
         <Panel
           title="output"
           right={
@@ -94,8 +99,25 @@ export function RevealView() {
             />
           </dl>
         </Panel>
-      )}
-    </div>
+  ) : null
+
+  return (
+    <Columns
+      left={tabs}
+      center={
+        <>
+          {carrierPanel}
+          {keyPanel}
+          <About />
+        </>
+      }
+      right={
+        <>
+          {busyLine}
+          {outputPanel}
+        </>
+      }
+    />
   )
 }
 
