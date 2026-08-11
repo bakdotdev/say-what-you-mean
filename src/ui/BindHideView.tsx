@@ -166,7 +166,7 @@ export function BindHideView() {
               </span>
             }
           >
-            <CopyableField value={carrier} label="copy carrier">
+            <CopyableField value={carrier} label="copy carrier" align="top">
               <TextArea
                 value={carrier}
                 onChange={(e) => setCarrier(e.target.value)}

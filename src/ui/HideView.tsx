@@ -192,7 +192,7 @@ export function HideView() {
           onClick={copy}
           disabled={!carrier}
           aria-label="copy carrier"
-          className="absolute right-2 top-2 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30"
+          className="absolute right-1.5 top-1.5 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30"
         >
           {copied ? "✓" : "copy"}
         </button>
@@ -240,7 +240,7 @@ export function HideView() {
           disabled={status.embedded || flips.length === 0 || ai.busy}
           className="w-full"
         >
-          {ai.busy ? `rewriting… (${ai.attempts}/3)` : "rewrite naturally · ai"}
+          {ai.busy ? "choosing words…" : "pick words naturally · ai"}
         </Button>
         {ai.error && (
           <p className="text-[10px] leading-relaxed tracking-wider text-fg">

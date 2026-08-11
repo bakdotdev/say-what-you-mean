@@ -157,10 +157,13 @@ export function CopyableField({
   value,
   children,
   label = "copy",
+  align = "center",
 }: {
   value: string
   children: ReactNode
   label?: string
+  /** Single-line fields centre the button; textareas pin it to the top. */
+  align?: "center" | "top"
 }) {
   const [done, setDone] = useState(false)
   const copy = async () => {
@@ -177,7 +180,12 @@ export function CopyableField({
         onClick={copy}
         disabled={!value}
         aria-label={label}
-        className="absolute right-1 top-1 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30"
+        // Right inset matches the field's vertical padding (py-1.5 = 6px) so
+        // the gap is equal on all three sides.
+        className={cx(
+          "absolute right-1.5 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30",
+          align === "center" ? "top-1/2 -translate-y-1/2" : "top-1.5",
+        )}
       >
         {done ? "✓" : "copy"}
       </button>

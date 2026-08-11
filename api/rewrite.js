@@ -1,36 +1,89 @@
 /**
- * Rewrites a carrier paragraph so that specific word slots hold specific
- * words, while keeping the author's meaning, tone and length.
+ * Picks the best-reading replacement word for each slot the codec requires to
+ * change.
  *
- * The codec stays authoritative: the client computes which slots must change
- * and the exact set of words that satisfy the constraint, and this route only
- * asks the model to weave those choices into natural prose. The client
- * re-verifies afterwards, so a disobedient model degrades to "no change"
- * rather than a broken carrier.
+ * Design note — this deliberately does NOT ask the model to rewrite the
+ * paragraph. Matrix embedding's syndrome depends on the parity of EVERY word,
+ * so any word the model touches beyond the planned slots invalidates the plan.
+ * Earlier versions invited exactly that ("reword surrounding phrasing freely")
+ * and could not converge.
  *
- * Uses the Vercel AI Gateway (OpenAI-compatible) with AI_GATEWAY_API_KEY.
+ * Instead the model does the one thing code cannot — judge which candidate
+ * reads best in context — and returns a pure mapping. The client applies the
+ * substitutions itself, at exact offsets, so only the planned slots ever
+ * change and the result is correct by construction.
+ *
+ * Protections: same-origin only, small body caps, and a per-IP token bucket.
  */
+
+export const config = { runtime: "edge" }
 
 const MODEL = "anthropic/claude-haiku-4.5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
-const SYSTEM = `You rewrite a paragraph so it reads naturally while using required words.
+const MAX_CARRIER = 6000
+const MAX_SLOTS = 60
+const MAX_OPTIONS = 30
 
-Rules, in priority order:
-1. For each required substitution you MUST use exactly one option from its list, replacing the given word.
-2. Keep the author's meaning, voice, tense and approximate length.
-3. You may reword surrounding phrasing so the required words fit smoothly — that is the point. Adjust articles, prepositions and connectives freely.
-4. Do NOT add or remove sentences. Do NOT add commentary.
-5. Return ONLY the rewritten paragraph as plain text.`
+// Per-IP token bucket. Edge instances are ephemeral and not shared, so this is
+// a speed bump against casual abuse rather than a guarantee; the hard limits
+// above are what bound cost per request.
+const RATE_CAPACITY = 12
+const RATE_WINDOW_MS = 60_000
+const buckets = new Map()
 
-// Edge runtime: this route only forwards a fetch, and the Web Request/Response
-// signature below is the edge contract.
-export const config = { runtime: "edge" }
+const allowed = (ip) => {
+  const now = Date.now()
+  const bucket = buckets.get(ip)
+  if (!bucket || now - bucket.start > RATE_WINDOW_MS) {
+    buckets.set(ip, { start: now, count: 1 })
+    if (buckets.size > 5000) buckets.clear()
+    return true
+  }
+  bucket.count += 1
+  return bucket.count <= RATE_CAPACITY
+}
+
+const SYSTEM = `You choose replacement words for a word-substitution puzzle.
+
+You are given a paragraph and a list of slots. Each slot names one word that
+MUST be replaced, and a list of allowed replacements. Choose, for each slot,
+the replacement that makes the sentence read most naturally — matching part of
+speech, number and tense as closely as the options allow.
+
+You may ONLY choose from the given options. You may not edit any other word,
+add words, or reorder anything.
+
+Reply with JSON only, no prose: {"picks":[{"slot":<number>,"word":"<option>"}]}
+Include exactly one entry per slot.`
+
+const json = (value, status = 200) =>
+  new Response(JSON.stringify(value), {
+    status,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  })
 
 export default async function handler(req) {
-  if (req.method !== "POST") {
-    return json({ error: "method not allowed" }, 405)
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405)
+
+  // Same-origin only: this endpoint exists for the app, not for the world.
+  const origin = req.headers.get("origin")
+  if (origin) {
+    try {
+      const host = new URL(origin).host
+      if (host !== new URL(req.url).host) {
+        return json({ error: "forbidden" }, 403)
+      }
+    } catch {
+      return json({ error: "forbidden" }, 403)
+    }
   }
+
+  const ip =
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  if (!allowed(ip)) return json({ error: "rate limited — try again shortly" }, 429)
 
   const key = process.env.AI_GATEWAY_API_KEY
   if (!key) return json({ error: "AI_GATEWAY_API_KEY not configured" }, 500)
@@ -42,27 +95,33 @@ export default async function handler(req) {
     return json({ error: "invalid json" }, 400)
   }
 
-  const { carrier, slots } = body
+  const { carrier, slots } = body ?? {}
   if (typeof carrier !== "string" || !carrier.trim()) {
     return json({ error: "carrier required" }, 400)
   }
-  if (!Array.isArray(slots) || slots.length === 0) {
-    return json({ rewritten: carrier })
-  }
-  if (carrier.length > 8000 || slots.length > 120) {
+  if (!Array.isArray(slots) || slots.length === 0) return json({ picks: [] })
+  if (carrier.length > MAX_CARRIER || slots.length > MAX_SLOTS) {
     return json({ error: "input too large" }, 413)
   }
 
-  const instructions = slots
-    .map(
-      (s, i) =>
-        `${i + 1}. replace "${s.from}" with one of: ${s.options
-          .slice(0, 12)
-          .join(", ")}`,
-    )
-    .join("\n")
+  const listed = slots.slice(0, MAX_SLOTS).map((s, i) => ({
+    slot: i,
+    from: String(s.from ?? "").slice(0, 40),
+    options: (Array.isArray(s.options) ? s.options : [])
+      .slice(0, MAX_OPTIONS)
+      .map((o) => String(o).slice(0, 40)),
+    context: String(s.context ?? "").slice(0, 300),
+  }))
 
-  const prompt = `Paragraph:\n${carrier}\n\nRequired substitutions:\n${instructions}\n\nRewrite the paragraph.`
+  const prompt = [
+    `Paragraph:\n${carrier}`,
+    "",
+    "Slots to replace:",
+    ...listed.map(
+      (s) =>
+        `slot ${s.slot}: replace "${s.from}"${s.context ? ` (context: …${s.context}…)` : ""}\n  options: ${s.options.join(", ")}`,
+    ),
+  ].join("\n")
 
   try {
     const res = await fetch(GATEWAY, {
@@ -74,7 +133,7 @@ export default async function handler(req) {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 2000,
-        temperature: 0.7,
+        temperature: 0.3,
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: prompt },
@@ -85,16 +144,15 @@ export default async function handler(req) {
     if (!res.ok) {
       const detail = await res.text()
       return json(
-        { error: `gateway ${res.status}`, detail: detail.slice(0, 400) },
+        { error: `gateway ${res.status}`, detail: detail.slice(0, 300) },
         502,
       )
     }
 
     const data = await res.json()
-    const rewritten = data.choices?.[0]?.message?.content?.trim()
-    if (!rewritten) return json({ error: "empty completion" }, 502)
-
-    return json({ rewritten })
+    const content = data.choices?.[0]?.message?.content ?? ""
+    const picks = parsePicks(content, listed)
+    return json({ picks })
   } catch (err) {
     return json(
       { error: err instanceof Error ? err.message : "request failed" },
@@ -103,8 +161,26 @@ export default async function handler(req) {
   }
 }
 
-const json = (value, status = 200) =>
-  new Response(JSON.stringify(value), {
-    status,
-    headers: { "content-type": "application/json" },
-  })
+/** Extract the JSON mapping and discard anything not in the allowed options. */
+function parsePicks(content, listed) {
+  const match = content.match(/\{[\s\S]*\}/)
+  if (!match) return []
+  let parsed
+  try {
+    parsed = JSON.parse(match[0])
+  } catch {
+    return []
+  }
+  const raw = Array.isArray(parsed?.picks) ? parsed.picks : []
+  const out = []
+  for (const entry of raw) {
+    const slot = Number(entry?.slot)
+    const word = String(entry?.word ?? "").toLowerCase()
+    const spec = listed[slot]
+    if (!spec) continue
+    // The model may only pick from what it was offered.
+    if (!spec.options.includes(word)) continue
+    out.push({ slot, word })
+  }
+  return out
+}
