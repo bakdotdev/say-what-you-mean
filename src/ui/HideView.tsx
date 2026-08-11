@@ -334,10 +334,6 @@ export function HideView({
           </span>
           LOCKED
         </span>
-        <span className="flex items-center gap-2">
-          <span className="font-mono text-muted">WORD</span>
-          NOT USED
-        </span>
         <span>CLICK A WORD FOR OPTIONS</span>
       </div>
       <Button

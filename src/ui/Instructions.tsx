@@ -13,8 +13,8 @@ export function Instructions({ durable }: { durable: boolean }) {
         </li>
         <li>
           Change the highlighted words. Only those are used to decrypt the
-          message{durable ? " — about one word in three" : ""}. Everything
-          unmarked is yours to write freely.
+          message{durable ? " — roughly a quarter of the text" : ""}.
+          Everything unmarked is free: write whatever you like.
         </li>
         <li>
           Click a word to lock it if it must stay exactly as written.
