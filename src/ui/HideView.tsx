@@ -253,24 +253,20 @@ export function HideView() {
       </div>
       {/* Swatches use MARK_STYLES, the same source as the text, so the
           legend cannot drift out of sync with what is rendered. */}
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] tracking-wider text-muted">
-        <span className="flex items-center gap-1.5">
-          <span
-            className={`rounded-[2px] font-mono normal-case text-fg ${MARK_STYLES.carrier}`}
-          >
-            word
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-wider text-muted">
+        <span className="flex items-center gap-2">
+          <span className={`px-1 font-mono text-fg ${MARK_STYLES.carrier}`}>
+            WORD
           </span>
-          being changed
+          BEING CHANGED
         </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            className={`rounded-[2px] font-mono normal-case text-fg ${MARK_STYLES.locked}`}
-          >
-            word
+        <span className="flex items-center gap-2">
+          <span className={`px-1 font-mono text-fg ${MARK_STYLES.locked}`}>
+            WORD
           </span>
-          locked by you
+          LOCKED BY YOU
         </span>
-        <span>// click any word to lock it</span>
+        <span>// CLICK ANY WORD TO LOCK IT</span>
       </div>
       <Button
         variant={embedded ? "ready" : "ghost"}

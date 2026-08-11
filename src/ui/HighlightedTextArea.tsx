@@ -43,8 +43,8 @@ const SHARED =
  * 1:1 with the text by construction, not by someone remembering to update it.
  */
 export const MARK_STYLES: Record<Mark["kind"], string> = {
-  locked: "bg-accent/45 shadow-[0_0_0_2px] shadow-accent/45",
-  carrier: "bg-accent/15 shadow-[0_0_0_2px] shadow-accent/15",
+  locked: "rounded bg-accent/45 shadow-[0_0_0_3px] shadow-accent/45",
+  carrier: "rounded bg-accent/15 shadow-[0_0_0_3px] shadow-accent/15",
   plain: "",
 }
 
@@ -89,7 +89,7 @@ export function HighlightedTextArea({
       <div
         ref={backRef}
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 overflow-hidden text-transparent ${SHARED}`}
+        className={`pointer-events-none absolute inset-0 z-10 overflow-hidden text-transparent ${SHARED}`}
       >
         {renderMarked(value, marks, onWordClick)}
       </div>
@@ -102,7 +102,7 @@ export function HighlightedTextArea({
         disabled={disabled}
         aria-label={ariaLabel}
         spellCheck={false}
-        className={`relative block w-full resize-y bg-transparent normal-case text-fg caret-accent outline-none placeholder:text-muted/60 ${SHARED}`}
+        className={`relative z-0 block w-full resize-y bg-transparent normal-case text-fg caret-accent outline-none placeholder:text-muted/60 ${SHARED}`}
       />
     </div>
   )
@@ -143,9 +143,9 @@ function renderMarked(
             : undefined
         }
         className={
-          `rounded-[2px] ${fill}` +
+          fill +
           (clickable
-            ? " pointer-events-auto cursor-pointer hover:bg-accent/25"
+            ? " pointer-events-auto cursor-pointer rounded hover:bg-accent/30"
             : "")
         }
       >
