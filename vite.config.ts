@@ -4,10 +4,9 @@ import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
+  // The app is served under this path via the lab shell's rewrite. Build
+  // output stays at `dist/` root; vercel.json maps the prefixed URLs back.
   base: "/say-what-you-mean/",
-  // Emit files physically under the base path so asset URLs and file paths
-  // agree when Vercel serves `dist` at the domain root.
-  build: { outDir: "dist/say-what-you-mean", emptyOutDir: true },
   plugins: [react(), tailwindcss()],
   test: {
     environment: "jsdom",
