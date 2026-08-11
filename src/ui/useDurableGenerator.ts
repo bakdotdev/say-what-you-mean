@@ -23,6 +23,10 @@ const CHUNK_SIZE = 40
 const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 const MAX_ROUNDS = 4
+/** How many usable words to hand the model to compose from. */
+const ALLOWED_SAMPLE = 700
+/** Draw them from the common end of the list so the prose stays plain. */
+const COMMON_BAND = 6000
 
 const TOPICS = [
   "an ordinary afternoon at home",
@@ -76,6 +80,18 @@ export function useDurableGenerator() {
         const base = import.meta.env.BASE_URL
         const encoder = await createEncoder(secret, passphrase, 1)
 
+        // Whether a word fits depends only on the word and the key, never on
+        // its neighbours — so the usable vocabulary is knowable before any
+        // text exists. Constraining composition beats repairing prose after
+        // the fact, which is what mangled earlier drafts.
+        setState({ busy: true, stage: "choosing vocabulary…", error: null })
+        const allowed = await encoder.suggestFrom(
+          "",
+          vocabulary.slice(0, COMMON_BAND),
+          ALLOWED_SAMPLE,
+          0,
+        )
+
         for (let round = 1; round <= MAX_ROUNDS; round++) {
           // Per-word needs far more words than matrix: every word carries, and
           // only the fitting ones count toward the payload.
@@ -86,7 +102,7 @@ export function useDurableGenerator() {
           const genRes = await fetch(`${base}api/generate`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ words, topic }),
+            body: JSON.stringify({ words, topic, allowed }),
           })
           if (!genRes.ok) {
             const detail = (await genRes.json().catch(() => ({}))) as {

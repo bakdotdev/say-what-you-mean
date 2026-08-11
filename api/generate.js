@@ -48,6 +48,27 @@ Rules:
 - Do not mention writing, messages, secrets, codes or this task.
 - Return ONLY the paragraph text.`
 
+/**
+ * When the caller supplies an allowed vocabulary, composition itself is
+ * constrained rather than the text being repaired afterwards. Writing fluently
+ * inside a large word list produces far better prose than swapping words out
+ * of finished sentences.
+ */
+const VOCAB_SYSTEM = `You write short, utterly ordinary prose using ONLY words
+from a supplied list.
+
+Rules:
+- EVERY word you write must appear in the list. This is absolute. If a word is
+  not in the list you may not use it, however natural it would be.
+- The list is large and contains ordinary English, so write real sentences:
+  a note about the day, an errand, the weather, a domestic detail.
+- Prefer sense over ambition. Short, plain sentences that genuinely read well
+  are the goal; do not force unusual words in.
+- No names of real people, no numbers, nothing memorable or quotable.
+- No lists, headings, quotes, emoji or markdown.
+- Do not mention writing, messages, secrets, codes or this task.
+- Return ONLY the paragraph text.`
+
 const json = (value, status = 200) =>
   new Response(JSON.stringify(value), {
     status,
@@ -77,6 +98,13 @@ export default async function handler(req) {
     Math.max(MIN_WORDS, Number(body?.words) || 160),
   )
   const topic = String(body?.topic ?? "an ordinary afternoon").slice(0, 80)
+  // Optional allowed vocabulary — capped so the prompt stays sane.
+  const allowed = Array.isArray(body?.allowed)
+    ? body.allowed
+        .slice(0, 900)
+        .map((w) => String(w).slice(0, 24))
+        .filter(Boolean)
+    : []
 
   try {
     const res = await fetch(GATEWAY, {
@@ -90,10 +118,15 @@ export default async function handler(req) {
         max_tokens: 1200,
         temperature: 0.9,
         messages: [
-          { role: "system", content: SYSTEM },
+          {
+            role: "system",
+            content: allowed.length ? VOCAB_SYSTEM : SYSTEM,
+          },
           {
             role: "user",
-            content: `Write about ${topic}. Aim for roughly ${words} words — it is better to run slightly long than short.`,
+            content: allowed.length
+              ? `Allowed words (use only these):\n${allowed.join(" ")}\n\nWrite about ${topic}. Aim for roughly ${words} words — better slightly long than short.`
+              : `Write about ${topic}. Aim for roughly ${words} words — it is better to run slightly long than short.`,
           },
         ],
       }),
