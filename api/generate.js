@@ -102,7 +102,7 @@ export default async function handler(req) {
   // Optional allowed vocabulary — capped so the prompt stays sane.
   const allowedWords = Array.isArray(body?.allowed)
     ? body.allowed
-        .slice(0, 900)
+        .slice(0, 3000)
         .map((w) => String(w).slice(0, 24))
         .filter(Boolean)
     : []

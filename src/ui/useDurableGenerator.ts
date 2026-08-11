@@ -23,10 +23,16 @@ const CHUNK_SIZE = 40
 const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 const MAX_ROUNDS = 4
-/** How many usable words to hand the model to compose from. */
-const ALLOWED_SAMPLE = 700
+/**
+ * Hand the model as much of the usable vocabulary as is practical. A small
+ * sample (700) forced it outside the list constantly, and every stray word
+ * then had to be swapped mechanically — which is what wrecked the prose. With
+ * a few thousand words it can write naturally AND stay inside the constraint,
+ * so the repair pass has almost nothing left to do.
+ */
+const ALLOWED_SAMPLE = 2600
 /** Draw them from the common end of the list so the prose stays plain. */
-const COMMON_BAND = 6000
+const COMMON_BAND = 7000
 
 const TOPICS = [
   "an ordinary afternoon at home",
