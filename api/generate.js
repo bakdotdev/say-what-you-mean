@@ -14,7 +14,11 @@ import { originAllowed, clientIp } from "./_origin.js"
 
 export const config = { runtime: "edge" }
 
-const MODEL = "anthropic/claude-haiku-4.5"
+// Writing fluently while obeying a multi-thousand-word vocabulary is an
+// instruction-following problem, not a context problem — the stronger model
+// stays inside the list far more reliably, which is what keeps the prose
+// intact through the repair pass.
+const MODEL = "anthropic/claude-sonnet-5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
 const MIN_WORDS = 60
@@ -102,7 +106,7 @@ export default async function handler(req) {
   // Optional allowed vocabulary — capped so the prompt stays sane.
   const allowedWords = Array.isArray(body?.allowed)
     ? body.allowed
-        .slice(0, 3000)
+        .slice(0, 4500)
         .map((w) => String(w).slice(0, 24))
         .filter(Boolean)
     : []

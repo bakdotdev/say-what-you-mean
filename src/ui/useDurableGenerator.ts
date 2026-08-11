@@ -30,9 +30,9 @@ const MAX_ROUNDS = 4
  * a few thousand words it can write naturally AND stay inside the constraint,
  * so the repair pass has almost nothing left to do.
  */
-const ALLOWED_SAMPLE = 2600
+const ALLOWED_SAMPLE = 4000
 /** Draw them from the common end of the list so the prose stays plain. */
-const COMMON_BAND = 7000
+const COMMON_BAND = 9000
 
 const TOPICS = [
   "an ordinary afternoon at home",

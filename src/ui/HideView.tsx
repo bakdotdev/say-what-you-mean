@@ -260,13 +260,13 @@ export function HideView({
           legend cannot drift out of sync with what is rendered. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-wider text-muted">
         <span className="flex items-center gap-2">
-          <span className={`px-1 font-mono text-fg ${MARK_STYLES.carrier}`}>
+          <span className={`font-mono text-fg ${MARK_STYLES.carrier}`}>
             WORD
           </span>
           BEING CHANGED
         </span>
         <span className="flex items-center gap-2">
-          <span className={`px-1 font-mono text-fg ${MARK_STYLES.locked}`}>
+          <span className={`font-mono text-fg ${MARK_STYLES.locked}`}>
             WORD
           </span>
           LOCKED BY YOU
