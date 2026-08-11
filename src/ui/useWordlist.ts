@@ -6,6 +6,18 @@
  */
 import { useEffect, useState } from "react"
 
+/**
+ * Where the frequency-ordered section ends.
+ *
+ * wordlist.txt is the Google 10k common-English list followed by the dwyl
+ * dictionary, and the dictionary is ALPHABETICAL. So index 10,000 is
+ * "abococket", 20,000 is "amphictyony", 29,000 is "arugula" — a band reaching
+ * past this boundary is not "more vocabulary", it is twenty thousand archaic
+ * words beginning with "a". Anything choosing replacement words must stop
+ * here.
+ */
+export const COMMON_WORD_COUNT = 9439
+
 let cache: string[] | null = null
 let inflight: Promise<string[]> | null = null
 

@@ -69,26 +69,42 @@ Rules:
 - Return ONLY the paragraph text.`
 
 /**
- * When the caller supplies an allowed vocabulary, composition itself is
- * constrained rather than the text being repaired afterwards. Writing fluently
- * inside a large word list produces far better prose than swapping words out
- * of finished sentences.
+ * Constrained composition — the caller supplies the word palette.
+ *
+ * Measured honestly: at the ~120-word scale a content-word whitelist cut the
+ * words needing substitution afterwards from 13% to 4%, but at the ~650 words
+ * a payload actually needs, adherence decays and the advantage disappears
+ * (12-13% either way). Naming both halves of the palette rather than calling
+ * the rest of English "unrestricted" was the best of the variants tried, and
+ * it keeps generation to a single call, which reads more cohesively than
+ * stitched runs.
+ *
+ * An earlier version demanded EVERY word come from one list; adherence was
+ * 42-47%, which is chance, and long lists made the model return nothing.
  */
-const VOCAB_SYSTEM = `You write short, utterly ordinary prose using ONLY words
-from a supplied list.
+const VOCAB_SYSTEM = `You write utterly ordinary first-person prose. Plain
+everyday vocabulary, simple sentences, no drama, no metaphor, no dialogue.
 
-Rules:
-- EVERY word you write must appear in the list. This is absolute. If a word is
-  not in the list you may not use it, however natural it would be.
+You are given two word lists and should use nothing else.
+
+KEY WORDS carry the meaning. Use as many DIFFERENT key words as you can — the
+more distinct ones appear, the better. Nouns, verbs, adjectives and adverbs
+must come from here.
+
+FREE WORDS are the joining words — articles, pronouns, prepositions and common
+words that add no weight. Use them freely and as often as you like.
+
+Use words exactly as spelled. A plural or a past tense is a different word:
+say "was" or "had" plus the listed form instead.
+
+Also:
 - Write ONE continuous account with a single subject, start to finish. Every
   sentence must follow from the last. Do not drift between unrelated scenes.
-- The list is large and contains ordinary English, so write real sentences.
-- Prefer sense over ambition. Short, plain sentences that genuinely read well
-  are the goal; do not force unusual words in.
+- Prefer a blander sentence over reaching for a word in neither list.
 - No names of real people, no numbers, nothing memorable or quotable.
 - No lists, headings, quotes, emoji or markdown.
 - Do not mention writing, messages, secrets, codes or this task.
-- Return ONLY the paragraph text.`
+- Return ONLY the prose.`
 
 const safeParse = (text) => {
   try {
@@ -128,6 +144,12 @@ export default async function handler(req, res) {
         .map((w) => String(w).slice(0, 24))
         .filter(Boolean)
     : []
+  const freeWords = Array.isArray(body?.free)
+    ? body.free
+        .slice(0, 900)
+        .map((w) => String(w).slice(0, 24))
+        .filter(Boolean)
+    : []
 
   try {
     const upstream = await fetch(GATEWAY, {
@@ -148,7 +170,7 @@ export default async function handler(req, res) {
           {
             role: "user",
             content: allowedWords.length
-              ? `Allowed words (use only these):\n${allowedWords.join(" ")}\n\nWrite about ${topic}. Aim for roughly ${words} words — better slightly long than short.`
+              ? `KEY WORDS: ${allowedWords.join(", ")}\n\nFREE WORDS: ${freeWords.join(", ")}\n\nWrite about ${topic}. It must run to at least ${words} words — describe each step in unhurried detail and do not wrap up early.`
               : `Write about ${topic}. Aim for roughly ${words} words — it is better to run slightly long than short.`,
           },
         ],

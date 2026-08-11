@@ -11,6 +11,7 @@
  * content-bearing options of a similar shape.
  */
 import { wordParity, type deriveKeys } from "../codec"
+import { COMMON_WORD_COUNT } from "./useWordlist"
 
 /**
  * The wordlist is the Google 10k common-English list first, then the long tail
@@ -21,12 +22,13 @@ import { wordParity, type deriveKeys } from "../codec"
  */
 const FUNCTION_WORD_RANK = 300
 /**
- * Widened well past the Google 10k. Function words can never carry, and only
- * half the remainder does, so excluding them thinned the usable pool — this
- * draws on the larger dictionary to make that back. 30k still reads as
- * ordinary English; beyond it the list turns archaic.
+ * Was 30000, on the belief that it "still reads as ordinary English". It does
+ * not: the list stops being frequency-ordered at COMMON_WORD_COUNT and the
+ * rest is an alphabetical dictionary, so two thirds of that band were archaic
+ * words beginning with "a" — "appaume", "aythya", "aliturgic". Suggestions
+ * looked like they were all from one letter because they were.
  */
-const COMMON_WORD_LIMIT = 30000
+const COMMON_WORD_LIMIT = COMMON_WORD_COUNT
 
 export const OPTIONS_PER_SLOT = 24
 
@@ -41,6 +43,20 @@ export interface CandidateOptions {
  * @param vocabulary frequency-ordered word list
  * @param used       words already present in the carrier, to avoid repeats
  */
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))
+
+/**
+ * A step that is coprime to `span`, so repeatedly adding it modulo span visits
+ * every index exactly once. Primes are tried in descending size so the samples
+ * land far apart; 1 is the fallback and degrades to a plain walk.
+ */
+const coprimeStride = (span: number): number => {
+  for (const p of [7919, 6367, 4787, 3571, 2833, 1597, 997, 397, 101]) {
+    if (p < span && gcd(p, span) === 1) return p
+  }
+  return 1
+}
+
 export const candidatesFor = async (
   word: string,
   keys: Awaited<ReturnType<typeof deriveKeys>>,
@@ -56,16 +72,23 @@ export const candidatesFor = async (
 
   // Search the common band, starting at a random point within it so repeated
   // slots don't all draw the same words.
+  //
+  // Stride rather than walk. Past the Google 10k the wordlist is the plain
+  // dictionary, in alphabetical order, and most of this band lies in it — so
+  // scanning consecutive indices returned candidates that all began with the
+  // same letter. A stride coprime to the span still visits every position,
+  // but spreads the samples across the whole band.
   const lo = isFunctionWord ? 0 : FUNCTION_WORD_RANK
   const hi = Math.min(vocabulary.length, COMMON_WORD_LIMIT)
   const span = hi - lo
   if (span <= 0) return []
   const start = lo + Math.floor(Math.random() * span)
+  const stride = coprimeStride(span)
 
   let probes = 0
   for (let i = 0; i < span && probes < 6000; i++) {
     if (near.length >= OPTIONS_PER_SLOT) break
-    const candidate = vocabulary[lo + ((start - lo + i) % span)]
+    const candidate = vocabulary[lo + ((start - lo + i * stride) % span)]
     if (!candidate || candidate === word || used.has(candidate)) continue
     // Very short words carry little meaning and rarely fit a content slot.
     if (!isFunctionWord && candidate.length < 4) continue

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { deriveKeys, wordParity } from "../codec"
 import { candidatesFor } from "./candidates"
+import { COMMON_WORD_COUNT } from "./useWordlist"
 
 const vocab = readFileSync(resolve(process.cwd(), "public/wordlist.txt"), "utf8")
   .split("\n")
@@ -49,4 +50,56 @@ describe("candidates", () => {
     const options = await candidatesFor("evening", keys, vocab, used)
     for (const o of options) expect(used.has(o)).toBe(false)
   }, 60_000)
+})
+
+describe("candidate spread", () => {
+  /**
+   * Past the Google 10k the wordlist is alphabetical, so a consecutive scan
+   * returned options that all began with the same letter — the whole option
+   * list would be "marble, march, mare, margin…". Options must sample across
+   * the band, not a contiguous alphabetical run.
+   */
+  it("does not return words that all start with the same letter", async () => {
+    const keys = await deriveKeys("swordfish")
+    let worst = 0
+    for (const word of ["kitchen", "evening", "counter", "shopping", "window"]) {
+      const options = await candidatesFor(word, keys, vocab, new Set())
+      if (options.length < 6) continue
+      const initials = options.map((o) => o[0])
+      const commonest = Math.max(
+        ...[...new Set(initials)].map(
+          (c) => initials.filter((x) => x === c).length,
+        ),
+      )
+      worst = Math.max(worst, commonest / options.length)
+    }
+    // A contiguous alphabetical run scores 1.0 here; real spread is well under.
+    expect(worst).toBeLessThan(0.5)
+  }, 60_000)
+})
+
+describe("wordlist shape", () => {
+  /**
+   * COMMON_WORD_COUNT is a hard-coded index into wordlist.txt. If the list is
+   * ever regenerated the boundary moves, and every band silently starts
+   * drawing archaic dictionary words again.
+   */
+  it("is frequency-ordered up to the boundary and alphabetical after", () => {
+    // The failure mode is not ordering as such — the dictionary is sorted by
+    // some non-ASCII collation ("abay" after "abaft") — it is that one letter
+    // takes over, so a band reaching past the boundary offers only "a" words.
+    const dominance = (words: string[]) => {
+      const initials = words.map((w) => w[0])
+      return (
+        Math.max(
+          ...[...new Set(initials)].map(
+            (c) => initials.filter((x) => x === c).length,
+          ),
+        ) / words.length
+      )
+    }
+    expect(dominance(vocab.slice(2000, 2600))).toBeLessThan(0.3)
+    expect(dominance(vocab.slice(COMMON_WORD_COUNT, COMMON_WORD_COUNT + 600)))
+      .toBeGreaterThan(0.9)
+  })
 })

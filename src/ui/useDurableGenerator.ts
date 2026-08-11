@@ -32,6 +32,8 @@ import {
   type Encoder,
 } from "../codec"
 import { isCarrierWord } from "../codec/equations"
+import { isFunctionWord } from "../codec/features"
+import { COMMON_WORD_COUNT } from "./useWordlist"
 
 export interface DurableGenState {
   busy: boolean
@@ -44,10 +46,21 @@ export interface DurableGenState {
  * clears the ~55 needed with margin; the generate function has a 60s budget.
  */
 const RUN_WORDS = 700
+/**
+ * How many allowed words to send. 477 works; ~1500 made the model return an
+ * empty completion, so this stays well inside what it will actually use.
+ */
+const ALLOWED_SAMPLE = 600
+/** Free half of the palette: function words plus common non-carriers. */
+const FREE_SAMPLE = 700
 /** Extra passes when the first piece lands short of a decode. */
 const MAX_RUNS = 4
-/** Vocabulary band scanned for fitting replacements. */
-const COMMON_BAND = 20000
+/**
+ * Vocabulary band scanned for fitting replacements. Must not pass
+ * COMMON_WORD_COUNT — beyond it the list is an alphabetical dictionary, and
+ * drawing from there is what produced "korea", "arab", "edward" and "blog".
+ */
+const COMMON_BAND = COMMON_WORD_COUNT
 const REPLACEMENT_POOL = 6000
 const OPTIONS_PER_SLOT = 32
 /**
@@ -113,6 +126,15 @@ export function useDurableGenerator() {
         }
         const fitting: string[] = []
         for (const word of pool) if (await isCarrier(word)) fitting.push(word)
+        // The other half of the palette: words that carry nothing, so the
+        // model can join the key words up without breaking anything. Naming
+        // them beat calling the rest of English "unrestricted".
+        const free: string[] = []
+        for (const word of vocabulary.slice(0, COMMON_BAND)) {
+          if (free.length >= FREE_SAMPLE) break
+          if (isFunctionWord(word)) free.push(word)
+          else if (word.length >= 3 && !(await isCarrier(word))) free.push(word)
+        }
         if (fitting.length === 0) {
           setState({ busy: false, stage: "", error: "no usable words found" })
           return null
@@ -130,12 +152,12 @@ export function useDurableGenerator() {
           const res = await fetch(`${base}api/generate`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            // No allowed-list: measured at 42-47% adherence, which IS chance
-            // given the list is ~half the vocabulary — the models ignore it,
-            // and passing it made Sonnet return empty completions. Repairing
-            // ~5% of words afterwards beats a constraint nobody honours.
             body: JSON.stringify({
               words: RUN_WORDS,
+              // The palette. Keep it near ALLOWED_SAMPLE — a list of ~1500
+              // made the model return an empty completion.
+              allowed: fitting.slice(0, ALLOWED_SAMPLE),
+              free,
               topic:
                 run === 1
                   ? topic
