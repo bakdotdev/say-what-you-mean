@@ -16,6 +16,7 @@ import { Columns } from "./Columns"
 import { About } from "./About"
 import { SwapPicker } from "./SwapPicker"
 import { Telemetry } from "./Telemetry"
+import { useAiRewrite } from "./useAiRewrite"
 
 export function HideView() {
   const [secret, setSecret] = useState("")
@@ -25,6 +26,7 @@ export function HideView() {
   const [copied, setCopied] = useState(false)
   const [applying, setApplying] = useState(false)
   const [picking, setPicking] = useState<number | null>(null)
+  const ai = useAiRewrite()
 
   const vocabulary = useVocabulary()
   const status = useMatrixPlan(secret, passphrase, carrier, locked)
@@ -71,6 +73,20 @@ export function HideView() {
   const copy = async () => {
     await navigator.clipboard.writeText(carrier)
     setCopied(true)
+  }
+
+  const aiRewrite = async () => {
+    const next = await ai.rewrite(
+      secret,
+      passphrase,
+      carrier,
+      vocabulary,
+      locked,
+    )
+    if (next) {
+      setCarrier(next)
+      setCopied(false)
+    }
   }
 
   const ready = Boolean(secret && passphrase)
@@ -220,11 +236,24 @@ export function HideView() {
       )}
       <div className="mt-3 space-y-1.5">
         <Button
+          onClick={aiRewrite}
+          disabled={status.embedded || flips.length === 0 || ai.busy}
+          className="w-full"
+        >
+          {ai.busy ? `rewriting… (${ai.attempts}/3)` : "rewrite naturally · ai"}
+        </Button>
+        {ai.error && (
+          <p className="text-[10px] leading-relaxed tracking-wider text-fg">
+            // {ai.error}
+          </p>
+        )}
+        <Button
+          variant="ghost"
           onClick={apply}
           disabled={status.embedded || flips.length === 0 || applying}
           className="w-full"
         >
-          {applying ? "applying…" : `apply ${flips.length} swaps`}
+          {applying ? "applying…" : `blunt swap ×${flips.length}`}
         </Button>
         <Button
           variant="ghost"

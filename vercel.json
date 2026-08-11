@@ -3,9 +3,25 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/say-what-you-mean/assets/:path*", "destination": "/assets/:path*" },
-    { "source": "/say-what-you-mean/wordlist.txt", "destination": "/wordlist.txt" },
-    { "source": "/say-what-you-mean", "destination": "/index.html" },
-    { "source": "/say-what-you-mean/:path*", "destination": "/index.html" }
+    {
+      "source": "/say-what-you-mean/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/say-what-you-mean/assets/:path*",
+      "destination": "/assets/:path*"
+    },
+    {
+      "source": "/say-what-you-mean/wordlist.txt",
+      "destination": "/wordlist.txt"
+    },
+    {
+      "source": "/say-what-you-mean",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/say-what-you-mean/:path*",
+      "destination": "/index.html"
+    }
   ]
 }
