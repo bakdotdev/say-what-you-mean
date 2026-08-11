@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   normalizeSecret,
   MAX_SECRET_LENGTH,
   DENSITY_PRESETS,
   FEATURE_METHODS,
+  tokenizeSpans,
 } from "../codec"
 import { useEncoder } from "./useEncoder"
 import { useVocabulary } from "./useWordlist"
-import { Button, Field, Meter, Panel, Tag, TextArea, TextInput } from "./primitives"
+import { Button, Field, Meter, Panel, Tag, TextInput } from "./primitives"
+import { HighlightedTextArea, type Mark } from "./HighlightedTextArea"
 import { WordInspector } from "./WordInspector"
 
 const DENSITY_LABELS: Record<number, { name: string; blurb: string }> = {
@@ -59,6 +61,21 @@ export function HideView() {
       clearTimeout(timer)
     }
   }, [encoder, vocabulary, carrier, shuffle])
+
+  // Box the words that are actually carrying the payload, in place, as the
+  // author types. Offsets come from the same tokenizer the codec uses.
+  const marks: Mark[] = useMemo(() => {
+    if (!state) return []
+    const spans = tokenizeSpans(carrier)
+    const out: Mark[] = []
+    spans.forEach((span, i) => {
+      const report = state.words[i]
+      if (report?.green) {
+        out.push({ start: span.start, end: span.end, kind: "carrier" })
+      }
+    })
+    return out
+  }, [state, carrier])
 
   const onSecret = (raw: string) =>
     setSecret(normalizeSecret(raw).slice(0, MAX_SECRET_LENGTH))
@@ -165,21 +182,21 @@ export function HideView() {
           ) : undefined
         }
       >
-        <TextArea
+        <HighlightedTextArea
           value={carrier}
-          onChange={(e) => {
-            setCarrier(e.target.value)
+          onChange={(next) => {
+            setCarrier(next)
             setCopied(false)
           }}
+          marks={marks}
           rows={6}
-          className="normal-case"
           placeholder={
             ready
-              ? "Write ordinary sentences. Keep the words that light up; replace the ones that don't."
+              ? "Write ordinary sentences. Boxed words are carrying the message — keep those."
               : "Enter a secret and passphrase to begin."
           }
           disabled={!ready}
-          aria-label="Carrier text"
+          ariaLabel="Carrier text"
         />
       </Panel>
 

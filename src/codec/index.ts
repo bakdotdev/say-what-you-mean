@@ -1,5 +1,6 @@
 export { ALPHABET, MAX_SECRET_LENGTH, normalizeSecret, isEncodable } from "./alphabet"
-export { tokenize } from "./tokenize"
+export { tokenize, tokenizeSpans } from "./tokenize"
+export type { TokenSpan } from "./tokenize"
 export { createEncoder, DENSITY_PRESETS } from "./encoder"
 export type {
   Encoder,

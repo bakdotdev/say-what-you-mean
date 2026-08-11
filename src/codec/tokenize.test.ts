@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { tokenize } from "./tokenize"
+import { tokenize, tokenizeSpans } from "./tokenize"
 
 describe("tokenize", () => {
   it("splits on punctuation and whitespace, lower-cases", () => {
@@ -36,5 +36,26 @@ describe("tokenize", () => {
 
   it("keeps digits", () => {
     expect(tokenize("room 101b")).toEqual(["room", "101b"])
+  })
+})
+
+describe("tokenizeSpans", () => {
+  it("returns the same words as tokenize", () => {
+    const text = "The cow, ate!  Grass — it's fine."
+    expect(tokenizeSpans(text).map((s) => s.word)).toEqual(tokenize(text))
+  })
+
+  it("gives offsets that slice back to the original words", () => {
+    const text = "Meet at the dock at 9."
+    for (const span of tokenizeSpans(text)) {
+      expect(text.slice(span.start, span.end).toLowerCase()).toBe(span.word)
+    }
+  })
+
+  it("keeps offsets aligned across punctuation and newlines", () => {
+    const text = "one,two\n\nthree   four"
+    const spans = tokenizeSpans(text)
+    expect(spans.map((s) => s.word)).toEqual(["one", "two", "three", "four"])
+    expect(text.slice(spans[3].start, spans[3].end)).toBe("four")
   })
 })
