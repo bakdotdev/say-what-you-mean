@@ -198,43 +198,41 @@ export function HideView({
           : "Shortest carrier. Any word edit breaks it."}
       </p>
       {durable && (
-        <label className="mt-3 flex cursor-pointer items-start gap-2 border-t border-edge pt-3 text-[10px] leading-relaxed tracking-wider text-muted">
-          <input
-            type="checkbox"
-            checked={freeWrite}
-            onChange={(e) => setFreeWrite(e.target.checked)}
-            className="mt-0.5 accent-accent"
+        <div className="mt-3 border-t border-edge pt-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={freeWrite}
             aria-label="Free-write mode"
-          />
-          <span>
-            <span className="text-fg-dim">FREE-WRITE</span>
-            <br />
+            onClick={() => setFreeWrite((v) => !v)}
+            className="flex w-full items-center gap-2 text-left"
+          >
+            {/* Square, amber, no native control — matches the terminal look. */}
+            <span
+              aria-hidden="true"
+              className={
+                "flex h-3 w-3 shrink-0 items-center justify-center border text-[8px] leading-none " +
+                (freeWrite
+                  ? "border-accent bg-accent text-ink"
+                  : "border-edge bg-panel text-transparent")
+              }
+            >
+              ×
+            </span>
+            <span
+              className={
+                "text-[10px] uppercase tracking-[0.18em] " +
+                (freeWrite ? "text-fg" : "text-muted")
+              }
+            >
+              free-write
+            </span>
+          </button>
+          <p className="mt-1.5 text-left text-[10px] leading-relaxed tracking-wider text-muted">
             Suggests only words that carry nothing, so anything you add stays
             free.
-          </span>
-        </label>
-      )}
-      <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
-        <div className="flex justify-between">
-          <dt className="text-muted">payload</dt>
-          <dd className="text-fg">{status.bits || "—"} bits</dd>
+          </p>
         </div>
-        <div className="flex justify-between">
-          <dt className="text-muted">words</dt>
-          <dd className="text-fg">{status.words}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-muted">locked</dt>
-          <dd className="text-fg">{locked.length}</dd>
-        </div>
-      </dl>
-      {locked.length > 0 && (
-        <button
-          onClick={() => setLocked([])}
-          className="mt-2 w-full border border-edge px-2 py-1 text-[10px] uppercase tracking-wider text-muted hover:border-accent hover:text-fg"
-        >
-          unlock all
-        </button>
       )}
     </Panel>
   )
