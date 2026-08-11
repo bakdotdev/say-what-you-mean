@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   normalizeSecret,
   MAX_SECRET_LENGTH,
@@ -6,7 +6,7 @@ import {
   FEATURE_METHODS,
 } from "../codec"
 import { useEncoder } from "./useEncoder"
-import { useWordDigests } from "./useWordlist"
+import { useVocabulary } from "./useWordlist"
 import { Button, Field, Meter, Panel, Tag, TextArea, TextInput } from "./primitives"
 import { WordInspector } from "./WordInspector"
 
@@ -31,12 +31,34 @@ export function HideView() {
     carrier,
     density,
   )
-  const digests = useWordDigests(encoder)
+  const vocabulary = useVocabulary()
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [shuffle, setShuffle] = useState(0)
 
-  const suggestions = useMemo(() => {
-    if (!encoder || digests.length === 0) return []
-    return encoder.suggest(carrier, digests, 10)
-  }, [encoder, digests, carrier])
+  // Scan the vocabulary on demand — hashes lazily and stops at the limit, so a
+  // ~360k-word list costs a few hundred HMACs instead of over a million.
+  useEffect(() => {
+    if (!encoder || vocabulary.length === 0) {
+      setSuggestions([])
+      return
+    }
+    let cancelled = false
+    const offset = shuffle % vocabulary.length
+    const timer = setTimeout(() => {
+      encoder
+        .suggestFrom(carrier, vocabulary, 12, offset)
+        .then((words) => {
+          if (!cancelled) setSuggestions(words)
+        })
+        .catch(() => {
+          if (!cancelled) setSuggestions([])
+        })
+    }, 180)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [encoder, vocabulary, carrier, shuffle])
 
   const onSecret = (raw: string) =>
     setSecret(normalizeSecret(raw).slice(0, MAX_SECRET_LENGTH))
@@ -211,7 +233,17 @@ export function HideView() {
           )}
 
           {suggestions.length > 0 && !solved && (
-            <Panel title="candidates">
+            <Panel
+              title="candidates"
+              right={
+                <button
+                  onClick={() => setShuffle((n) => n + 977)}
+                  className="text-[10px] uppercase tracking-wider text-muted hover:text-fg"
+                >
+                  more ↻
+                </button>
+              }
+            >
               <div className="flex flex-wrap gap-1">
                 {suggestions.map((w) => (
                   <button

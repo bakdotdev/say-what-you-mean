@@ -1,57 +1,46 @@
 /**
- * Loads the common-word list once (for the stuck-helper) and, given the
- * current encoder, precomputes each word's keyed digest so suggestions are a
- * fast synchronous filter. Digests depend only on the passphrase, so they are
- * recomputed when the encoder instance changes.
+ * Loads the vocabulary once. The list is large (~360k words: the Google 10k
+ * common list first, then the dwyl english-words long tail), so we do NOT
+ * precompute keyed digests — that would be over a million HMACs. Suggestions
+ * hash on demand and stop as soon as enough fitting words are found.
  */
 import { useEffect, useState } from "react"
-import type { Encoder, WordFeatureDigests } from "../codec"
 
-/**
- * The full list is ~10k frequency-ordered words. Digesting all of them means
- * 4 HMACs each, which stalls the main thread, so suggestions draw from the
- * most common slice — those are the words a person would actually reach for.
- * The codec itself accepts any word the author types; this cap only bounds the
- * "stuck?" helper.
- */
-const SUGGESTION_POOL = 2500
+let cache: string[] | null = null
+let inflight: Promise<string[]> | null = null
 
-let wordsCache: string[] | null = null
-
-const loadWords = async (): Promise<string[]> => {
-  if (wordsCache) return wordsCache
-  const res = await fetch(`${import.meta.env.BASE_URL}wordlist.txt`)
-  const text = await res.text()
-  wordsCache = [
-    ...new Set(text.split("\n").map((w) => w.trim()).filter(Boolean)),
-  ].slice(0, SUGGESTION_POOL)
-  return wordsCache
+const loadWords = (): Promise<string[]> => {
+  if (cache) return Promise.resolve(cache)
+  if (!inflight) {
+    inflight = fetch(`${import.meta.env.BASE_URL}wordlist.txt`)
+      .then((r) => r.text())
+      .then((text) => {
+        cache = text
+          .split("\n")
+          .map((w) => w.trim())
+          .filter(Boolean)
+        return cache
+      })
+      .catch(() => {
+        inflight = null
+        return []
+      })
+  }
+  return inflight
 }
 
-export function useWordDigests(encoder: Encoder | null): WordFeatureDigests[] {
-  const [digests, setDigests] = useState<WordFeatureDigests[]>([])
+export function useVocabulary(): string[] {
+  const [words, setWords] = useState<string[]>(cache ?? [])
 
   useEffect(() => {
     let cancelled = false
-    if (!encoder) {
-      setDigests([])
-      return
-    }
-    loadWords()
-      .then(async (words) => {
-        const out: WordFeatureDigests[] = []
-        for (const word of words) {
-          out.push(await encoder.digestsFor(word))
-        }
-        if (!cancelled) setDigests(out)
-      })
-      .catch(() => {
-        if (!cancelled) setDigests([])
-      })
+    loadWords().then((w) => {
+      if (!cancelled) setWords(w)
+    })
     return () => {
       cancelled = true
     }
-  }, [encoder])
+  }, [])
 
-  return digests
+  return words
 }

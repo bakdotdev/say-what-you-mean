@@ -12,6 +12,9 @@ const wordlist = readFileSync(
   .split("\n")
   .map((w) => w.trim())
   .filter(Boolean)
+  // The shipped list is ~360k words; the common prefix is plenty for tests
+  // and keeps the suite fast.
+  .slice(0, 4000)
 
 const candidatesFor = async (
   encoder: Encoder,

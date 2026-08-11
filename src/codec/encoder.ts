@@ -73,6 +73,18 @@ export interface Encoder {
     candidates: readonly WordFeatureDigests[],
     limit?: number,
   ): string[]
+  /**
+   * Scan a large vocabulary for fitting words, hashing on demand and stopping
+   * as soon as `limit` are found. Lets the wordlist be hundreds of thousands
+   * of words without precomputing (which would be millions of HMACs).
+   * `offset` varies which part of the list is scanned so suggestions differ.
+   */
+  suggestFrom(
+    text: string,
+    vocabulary: readonly string[],
+    limit?: number,
+    offset?: number,
+  ): Promise<string[]>
   digestsFor(word: string): Promise<WordFeatureDigests>
 }
 
@@ -181,7 +193,27 @@ export const createEncoder = async (
     return out
   }
 
-  return { B, density, evaluate, suggest, digestsFor }
+  const suggestFrom = async (
+    text: string,
+    vocabulary: readonly string[],
+    limit = 10,
+    offset = 0,
+  ): Promise<string[]> => {
+    const used = new Set(tokenize(text))
+    const out: string[] = []
+    const n = vocabulary.length
+    if (n === 0) return out
+    // Bounded scan so a miss-heavy pass can never block the UI.
+    const maxProbe = Math.min(n, 4000)
+    for (let probe = 0; probe < maxProbe && out.length < limit; probe++) {
+      const word = vocabulary[(offset + probe) % n]
+      if (!word || used.has(word)) continue
+      if (reportFor(await digestsFor(word))[0].green) out.push(word)
+    }
+    return out
+  }
+
+  return { B, density, evaluate, suggest, suggestFrom, digestsFor }
 }
 
 /** Probe increasing deletion counts; return the largest that always decodes. */
