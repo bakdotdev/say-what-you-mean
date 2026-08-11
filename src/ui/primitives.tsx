@@ -15,16 +15,20 @@ export function Button({
   variant = "solid",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "solid" | "ghost"
+  variant?: "solid" | "ghost" | "ready"
 }) {
   return (
     <button
       {...props}
       className={cx(
         "inline-flex items-center justify-center gap-2 border px-3 py-1.5 text-xs uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-30",
-        variant === "solid"
-          ? "border-accent bg-accent/10 text-accent hover:bg-accent/20"
-          : "border-edge bg-transparent text-muted hover:border-fg-dim hover:text-fg",
+        variant === "solid" &&
+          "border-accent bg-accent/10 text-accent hover:bg-accent/20",
+        // Filled amber with dark text — the one call to action that is "done".
+        variant === "ready" &&
+          "border-accent bg-accent text-ink hover:bg-accent/85",
+        variant === "ghost" &&
+          "border-edge bg-transparent text-muted hover:border-fg-dim hover:text-fg",
         className,
       )}
     />

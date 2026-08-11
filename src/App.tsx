@@ -1,26 +1,23 @@
-import { useState } from "react"
+import { useUrlState } from "./ui/useUrlState"
 import { HideView } from "./ui/HideView"
 import { RevealView } from "./ui/RevealView"
 import { BindHideView } from "./ui/BindHideView"
 import { BindRevealView } from "./ui/BindRevealView"
 import { PageEffect } from "./ui/PageEffect"
 
-type Version = "v1" | "v2"
-type Tab = "hide" | "reveal"
 
-const TABS: { id: Tab; label: string; glyph: string }[] = [
+const TABS: { id: "hide" | "reveal"; label: string; glyph: string }[] = [
   { id: "hide", label: "hide", glyph: "▚" },
   { id: "reveal", label: "reveal", glyph: "▞" },
 ]
 
-const VERSIONS: { id: Version; label: string; blurb: string }[] = [
+const VERSIONS: { id: "v1" | "v2"; label: string; blurb: string }[] = [
   { id: "v1", label: "v1", blurb: "swaps words · nothing else to send" },
   { id: "v2", label: "v2", blurb: "text untouched · short key travels with it" },
 ]
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("hide")
-  const [version, setVersion] = useState<Version>("v1")
+  const { version, mode: tab, setVersion, setMode: setTab } = useUrlState()
 
   const tabs = (
     <div

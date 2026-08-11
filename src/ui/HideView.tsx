@@ -283,7 +283,7 @@ export function HideView() {
           {applying ? "applying…" : `blunt swap ×${flips.length}`}
         </Button>
         <Button
-          variant="ghost"
+          variant={status.embedded ? "ready" : "ghost"}
           onClick={copy}
           disabled={!status.embedded}
           className="w-full"
