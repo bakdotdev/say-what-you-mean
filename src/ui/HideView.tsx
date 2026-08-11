@@ -18,6 +18,8 @@ import { SwapPicker } from "./SwapPicker"
 import { Telemetry } from "./Telemetry"
 import { useAiRewrite } from "./useAiRewrite"
 import { useCarrierGenerator } from "./useCarrierGenerator"
+import { useDurableGenerator } from "./useDurableGenerator"
+import { useDurablePlan } from "./useDurablePlan"
 
 export function HideView() {
   const [secret, setSecret] = useState("")
@@ -29,12 +31,21 @@ export function HideView() {
   const [picking, setPicking] = useState<number | null>(null)
   const ai = useAiRewrite()
   const generator = useCarrierGenerator()
+  const durableGen = useDurableGenerator()
+  const [durable, setDurable] = useState(false)
 
   const vocabulary = useVocabulary()
   const status = useMatrixPlan(secret, passphrase, carrier, locked)
+  const durablePlan = useDurablePlan(secret, passphrase, carrier, durable)
   const spans = useMemo(() => tokenizeSpans(carrier), [carrier])
 
-  const flips = useMemo(() => status.plan?.flips ?? [], [status.plan])
+  const flips = useMemo(
+    () => (durable ? durablePlan.unfit : (status.plan?.flips ?? [])),
+    [durable, durablePlan.unfit, status.plan],
+  )
+  const embedded = durable
+    ? (durablePlan.state?.solved ?? false)
+    : status.embedded
   const flipSet = useMemo(() => new Set(flips), [flips])
   const lockedSet = useMemo(() => new Set(locked), [locked])
 
@@ -78,7 +89,8 @@ export function HideView() {
   }
 
   const generateCarrier = async () => {
-    const next = await generator.generate(secret, passphrase, vocabulary)
+    const engine = durable ? durableGen : generator
+    const next = await engine.generate(secret, passphrase, vocabulary)
     if (next) {
       setCarrier(next)
       setLocked([])
@@ -106,13 +118,38 @@ export function HideView() {
     <Panel
       title="encoding"
       right={
-        <span className="text-[10px] tracking-wider text-muted">matrix</span>
+        <span className="text-[10px] tracking-wider text-muted">
+          {durable ? "per-word" : "matrix"}
+        </span>
       }
     >
+      <div className="mb-2 flex border border-edge">
+        {(
+          [
+            { id: false, label: "compact" },
+            { id: true, label: "durable" },
+          ] as const
+        ).map((opt, i) => (
+          <button
+            key={opt.label}
+            onClick={() => setDurable(opt.id)}
+            aria-pressed={durable === opt.id}
+            className={
+              "flex-1 px-2 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors " +
+              (i > 0 ? "border-l border-edge " : "") +
+              (durable === opt.id
+                ? "bg-accent/15 text-fg"
+                : "bg-panel text-muted hover:text-fg-dim")
+            }
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
       <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-        // syndrome coding: the whole paragraph is one codeword, and only the
-        minimum-weight correction changes. most of your text is left exactly as
-        written.
+        {durable
+          ? "// every word carries its own clue, so deleting or reordering words just drops clues and the rest still reconstruct the message. altering a word does break it. costs about twice the length."
+          : "// syndrome coding: the whole paragraph is one codeword and only the minimum-weight correction changes. shortest carrier, but word edits break it."}
       </p>
       <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
         <div className="flex justify-between">
@@ -174,7 +211,7 @@ export function HideView() {
       right={
         ready ? (
           <span className="text-[10px] tracking-wider text-muted">
-            {status.embedded
+            {embedded
               ? "embedded"
               : `${flips.length} to swap of ${status.words}`}
           </span>
@@ -203,9 +240,9 @@ export function HideView() {
         // shaded = being changed · solid = locked by you · click any word to lock it
       </p>
       <Button
-        variant={status.embedded ? "ready" : "ghost"}
+        variant={embedded ? "ready" : "ghost"}
         onClick={copy}
-        disabled={!status.embedded}
+        disabled={!embedded}
         className="mt-2 w-full"
       >
         {copied ? "copied ✓" : "copy carrier"}
@@ -221,7 +258,7 @@ export function HideView() {
           <Tag>working</Tag>
         ) : status.problem ? (
           <Tag tone="red">blocked</Tag>
-        ) : status.embedded ? (
+        ) : embedded ? (
           <Tag tone="green">embedded</Tag>
         ) : (
           <Tag>{flips.length} swaps</Tag>
@@ -229,9 +266,9 @@ export function HideView() {
       }
     >
       <Meter
-        value={status.embedded ? 1 : status.words}
-        max={status.embedded ? 1 : Math.max(status.words, status.bits + 1)}
-        tone={status.embedded ? "green" : "accent"}
+        value={embedded ? 1 : status.words}
+        max={embedded ? 1 : Math.max(status.words, status.bits + 1)}
+        tone={embedded ? "green" : "accent"}
       />
       {status.problem ? (
         <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-fg">
@@ -239,7 +276,7 @@ export function HideView() {
         </p>
       ) : (
         <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-          {status.embedded
+          {embedded
             ? "// this text carries the message. copy it."
             : `// swap the ${flips.length} boxed words, or apply automatically`}
         </p>
@@ -247,21 +284,21 @@ export function HideView() {
       <div className="mt-3 space-y-1.5">
         <Button
           onClick={generateCarrier}
-          disabled={generator.busy}
+          disabled={generator.busy || durableGen.busy}
           className="w-full"
         >
-          {generator.busy
-            ? generator.stage || "generating…"
+          {generator.busy || durableGen.busy
+            ? generator.stage || durableGen.stage || "generating…"
             : "generate a carrier for me"}
         </Button>
-        {generator.error && (
+        {(generator.error || durableGen.error) && (
           <p className="text-[10px] leading-relaxed tracking-wider text-fg">
-            // {generator.error}
+            // {generator.error ?? durableGen.error}
           </p>
         )}
         <Button
           onClick={aiRewrite}
-          disabled={status.embedded || flips.length === 0 || ai.busy}
+          disabled={embedded || flips.length === 0 || ai.busy || durable}
           className="w-full"
         >
           {ai.busy ? "choosing words…" : "pick words naturally · ai"}
@@ -274,7 +311,7 @@ export function HideView() {
         <Button
           variant="ghost"
           onClick={apply}
-          disabled={status.embedded || flips.length === 0 || applying}
+          disabled={embedded || flips.length === 0 || applying}
           className="w-full"
         >
           {applying ? "applying…" : `blunt swap ×${flips.length}`}
