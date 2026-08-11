@@ -25,8 +25,9 @@ hash, spell out the encrypted secret.
   unstable hiding success. This design replaces the corpus search with a
   human writing under live feedback, which fixes all three.
 - Cardan grille (1550): a shared key selects which parts of an innocent,
-  human-composed text carry the message. Same idea; our "grille" is a keyed
-  hash over word bigrams, and content-addressing makes it deletion-proof.
+  human-composed text carry the message. Same idea; our "grille" is a set of
+  keyed hashes over per-word features, and content-addressing makes it
+  deletion-proof.
 - Robust watermarking: position-invariant features + erasure coding is the
   standard recipe for surviving edits. A simulation (300 trials/row) showed
   position-addressed schemes lose ~40% of an 8-char secret after ONE word
@@ -91,41 +92,57 @@ besides the carrier text, so there is nowhere to put a per-message salt.
 Mitigated by iteration count and the app-specific constant. All via Web
 Crypto; constants frozen as protocol v1.
 
-### 3.4 The carrier channel: keyed single-word equations
+### 3.4 The carrier channel: keyed multi-method equations
 
-Tokenize the carrier (§3.6). Each word emits one equation about the payload
-bits:
+Tokenize the carrier (§3.6). Each word emits one equation per ACTIVE feature
+method:
 
 ```
-h = HMAC(k_addr, word)
-equation: XOR of payload bits in subset(h)  ==  parity(h)
+for each active feature f of word w:
+  h = HMAC(k_addr, f)
+  equation: XOR of payload bits in subset(h) == parity(h)
 ```
 
-- `subset(h)`: a sparse, h-seeded subset of the B payload bit indices
-  (LT/fountain-style, low degree, Soliton-ish distribution tuned via the
-  simulation harness).
-- `parity(h)`: one bit derived from h.
+**Feature methods** (ordered; density k activates the first k):
 
-Every word asserts one equation. **Roughly half of all candidate words yield
-a true equation** — the author's job, guided by live feedback, is to keep
-only words that light green.
+1. `identity` — the whole word
+2. `letterRelations` — gaps between consecutive letters mod 26 (the original
+   "character relationships" idea, generalized and keyed)
+3. `shape` — length plus first/last letter
+4. `affixes` — first-3 and last-3 letters
 
-**Why single-word (not bigram) addressing:** each equation depends only on
-its own word, never on neighbors. So deleting or altering a word is a *clean
-erasure* — it removes that one equation and creates no false "bridge"
-equation elsewhere. A simulation (`scratchpad/codec-sim.mjs`, 40 trials/row)
-confirmed this decodes 40/40 and survives 39–74 deletions with redundancy,
-whereas a position/bigram scheme injects errors on every deletion. The hash
-still digests every character of the word and its arrangement (`cat` ≠ `act`
-≠ `cats`), so this remains the character-relationship cipher — scoped to each
-word, which is exactly what buys the robustness. Repeated identical words
-produce identical (redundant) equations, so the UI nudges toward varied
-words; duplicates never harm, they just don't add new information.
+**Density slider.** A word is usable ("green") only if it satisfies **all**
+active methods. More methods = more equations per word = shorter carrier, but
+fewer usable words. Measured on the real 10k wordlist (B=74):
+
+| Density | Usable words | Carrier needed |
+|---|---|---|
+| 1 | ~50% | ~340 words |
+| 2 | ~25% | ~170 words |
+| 4 | ~6.5% | ~93 words |
+
+**Why all-or-nothing per word, not a fuzzy threshold.** An earlier design let a
+word count if it satisfied e.g. 75% of its methods, mixing satisfied and
+unsatisfied equations. That silently corrupts the linear system: false
+equations are errors, not erasures, and the solver converges confidently to
+the wrong payload (measured: 33/116 bits wrong). Requiring every active method
+to hold guarantees each equation the decoder sees is true, so word loss stays a
+clean erasure.
+
+**Why equations, not votes.** A scheme where each word casts a fixed "vote"
+(`value = hash(word)`) carries no information: the value isn't selectable, so
+each bit receives ~50/50 coin flips and the tally converges to noise
+(verified — 0/20 trials decoded). Information requires a *choice*; the writer's
+choice is which words to keep.
 
 ### 3.5 Decoding
 
-1. Tokenize; compute every word's equation.
-2. Deduplicate identical equations.
+The receiver knows neither the secret length N nor the density used, so it
+searches both (4 x 16 = 64 cheap attempts; the MAC arbitrates).
+
+1. Tokenize; compute every word's equations at the candidate density.
+2. Deduplicate. If two equations over the same bit-subset disagree, the
+   candidate density is wrong — reject it before any linear algebra.
 3. Solve by **peeling** (belief propagation): repeatedly apply degree-1
    equations, substituting solved bits back. If peeling stalls with bits
    still coupled, finish with Gaussian elimination on the residual system
@@ -145,15 +162,17 @@ words; duplicates never harm, they just don't add new information.
 
 ### 3.7 Robustness model
 
-- **Word deleted** → its two bigram equations vanish (erasures); the bigram
-  bridging the gap contributes one possibly-false equation (outvoted).
-  Damage is local — nothing shifts.
-- **Word altered** → same as delete-plus-insert; local.
-- **Sentence/paragraph reordered** → equations are position-free; only the
-  two boundary bigrams are affected.
+- **Word deleted** → its equations vanish (clean erasures). Nothing shifts and
+  no false equation is manufactured, because each equation depends only on its
+  own word.
+- **Word altered** → same as delete-plus-insert; strictly local.
+- **Sentence/paragraph reordered** → equations are position-free; unaffected.
 - **Draft-time edits** → the app re-encodes live on every keystroke; an edit
-  only re-evaluates the touched word's two bigrams (content addressing makes
-  live re-encode cheap).
+  only re-evaluates the touched word (content addressing makes live re-encode
+  cheap).
+- **Higher density costs resilience per word**: deleting a word now removes
+  `density` equations rather than one. Resilience comes from writing past the
+  minimum, which the durability meter reports directly.
 - **Durability meter**: writing past minimal solvability adds redundant
   equations. The meter reports estimated survivable deletions (quick local
   Monte Carlo over the actual equation set), so fragility is visible, never
@@ -177,6 +196,13 @@ fresh (unseen) green words via the stuck-helper raises the effective unique
 fraction and lowers these counts in practice.
 
 ## 4. Application
+
+### 4.0 Wordlist
+
+`public/wordlist.txt` is the Google 10k English list (frequency-ordered,
+Unlicense/public domain), ~9,963 words. The stuck-helper digests only the most
+common 2,500 (4 HMACs each) to keep the main thread responsive; the codec
+itself accepts any word the author types.
 
 ### 4.1 UI
 
