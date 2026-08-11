@@ -49,7 +49,15 @@ const MAX_RUNS = 4
 /** Vocabulary band scanned for fitting replacements. */
 const COMMON_BAND = 20000
 const REPLACEMENT_POOL = 6000
-const OPTIONS_PER_SLOT = 20
+const OPTIONS_PER_SLOT = 32
+/**
+ * How far into the frequency-ordered pool options are drawn from. The pool is
+ * built from a web-derived word list whose tail is names and jargon, so
+ * ranging over all of it produced replacements like "korea" and "blog".
+ */
+const COMMON_HEAD = 260
+/** Kept below the endpoint's slot cap so no batch is refused outright. */
+const SLOTS_PER_REQUEST = 40
 
 const TOPICS = [
   "an ordinary afternoon at home",
@@ -199,8 +207,14 @@ export function useDurableGenerator() {
  * Distinctness is enforced when a word is CHOSEN, not when it is offered.
  * Reserving every option per slot burned twenty pool words per slot, so a few
  * dozen slots exhausted the pool and every slot after that was silently left
- * unrepaired — and one unfit carrier is enough to make the decoder reject the
- * whole text, which is why generation kept running to 3000 words and failing.
+ * unrepaired — and one unfit carrier makes the decoder reject the whole text.
+ *
+ * Three things decide whether the result reads like prose rather than word
+ * salad, and all three were missing: the model needs the surrounding sentence
+ * to judge a word, it needs enough options to find one that fits, and it needs
+ * to be asked about every slot — a single oversized request is refused whole,
+ * which is how a carrier came back reading "some arab rock signed into edward
+ * and blog".
  */
 export async function repair(
   encoder: Encoder,
@@ -218,50 +232,74 @@ export async function repair(
   const inText = new Set(spans.map((s) => s.word))
   const available = fitting.filter((w) => w.length >= 3 && !inText.has(w))
   if (!available.length) return carrier
+  // The pool is frequency-ordered, so its head is the ordinary words. Options
+  // are drawn from a rotating window over that head; ranging over the whole
+  // pool reached the rare tail and offered names and web jargon.
+  const head = Math.min(available.length, COMMON_HEAD)
 
-  // Overlapping option windows, so every slot gets a full set of candidates.
   const specs = unfit.flatMap((slot, n) => {
     const span = spans[slot]
     if (!span) return []
-    const seed = (n * 137) % available.length
+    const seed = (n * 31) % head
     const options = Array.from({ length: OPTIONS_PER_SLOT }, (_, i) =>
-      available[(seed + i) % available.length],
+      available[(seed + i) % head],
     ).sort(
       (a, b) =>
         Math.abs(a.length - span.word.length) -
         Math.abs(b.length - span.word.length),
     )
-    return [{ slot, from: span.word, options }]
+    return [
+      {
+        slot,
+        from: span.word,
+        options,
+        context: carrier
+          .slice(Math.max(0, span.start - 60), span.end + 60)
+          .replace(/\s+/g, " ")
+          .trim(),
+      },
+    ]
   })
   if (!specs.length) return carrier
 
-  const chosen = new Map<number, string>()
-  // The rewrite endpoint caps how many slots it will consider, and a large
-  // carrier can exceed its size limit; either way it declines and the
-  // deterministic fallback below still repairs every slot.
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        carrier,
-        slots: specs.map((s) => ({ from: s.from, options: s.options })),
-      }),
-    })
-    if (res.ok) {
-      const { picks } = (await res.json()) as {
-        picks?: { slot: number; word: string }[]
-      }
-      for (const pick of picks ?? []) {
-        const spec = specs[pick.slot]
-        if (spec && spec.options.includes(pick.word)) {
-          chosen.set(spec.slot, pick.word)
-        }
-      }
-    }
-  } catch {
-    // Deterministic fallback below.
+  // One request per batch, in parallel. The endpoint caps slots per request,
+  // and its reply budget is finite, so asking for everything at once gets the
+  // whole set refused and every word falls back to a blind pick.
+  const batches: (typeof specs)[] = []
+  for (let i = 0; i < specs.length; i += SLOTS_PER_REQUEST) {
+    batches.push(specs.slice(i, i + SLOTS_PER_REQUEST))
   }
+  const chosen = new Map<number, string>()
+  await Promise.all(
+    batches.map(async (batch) => {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            carrier,
+            slots: batch.map((s) => ({
+              from: s.from,
+              options: s.options,
+              context: s.context,
+            })),
+          }),
+        })
+        if (!res.ok) return
+        const { picks } = (await res.json()) as {
+          picks?: { slot: number; word: string }[]
+        }
+        for (const pick of picks ?? []) {
+          const spec = batch[pick.slot]
+          if (spec && spec.options.includes(pick.word)) {
+            chosen.set(spec.slot, pick.word)
+          }
+        }
+      } catch {
+        // Deterministic fallback below covers this batch.
+      }
+    }),
+  )
 
   // Resolve to distinct words, falling back through each slot's options and
   // then through the pool at large, so no slot is ever left unrepaired.

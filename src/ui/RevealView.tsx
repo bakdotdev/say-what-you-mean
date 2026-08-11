@@ -109,9 +109,8 @@ export function RevealView() {
       left={
         <Panel title="about">
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            paste the text you received and enter the shared passphrase. the
-            Paste the text you received and enter the shared passphrase.
-            Missing or reordered words are tolerated.
+            paste the text you received and enter the shared passphrase.
+            missing or reordered words are tolerated.
           </p>
         </Panel>
       }
