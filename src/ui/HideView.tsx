@@ -17,6 +17,7 @@ import { About } from "./About"
 import { SwapPicker } from "./SwapPicker"
 import { Telemetry } from "./Telemetry"
 import { useAiRewrite } from "./useAiRewrite"
+import { useCarrierGenerator } from "./useCarrierGenerator"
 
 export function HideView() {
   const [secret, setSecret] = useState("")
@@ -27,6 +28,7 @@ export function HideView() {
   const [applying, setApplying] = useState(false)
   const [picking, setPicking] = useState<number | null>(null)
   const ai = useAiRewrite()
+  const generator = useCarrierGenerator()
 
   const vocabulary = useVocabulary()
   const status = useMatrixPlan(secret, passphrase, carrier, locked)
@@ -73,6 +75,15 @@ export function HideView() {
   const copy = async () => {
     await navigator.clipboard.writeText(carrier)
     setCopied(true)
+  }
+
+  const generateCarrier = async () => {
+    const next = await generator.generate(secret, passphrase, vocabulary)
+    if (next) {
+      setCarrier(next)
+      setLocked([])
+      setCopied(false)
+    }
   }
 
   const aiRewrite = async () => {
@@ -170,6 +181,22 @@ export function HideView() {
         ) : undefined
       }
     >
+      <div className="mb-2 flex items-center gap-2">
+        <Button
+          onClick={generateCarrier}
+          disabled={!ready || generator.busy}
+          className="w-full"
+        >
+          {generator.busy
+            ? generator.stage || "generating…"
+            : "generate a carrier for me"}
+        </Button>
+      </div>
+      {generator.error && (
+        <p className="mb-2 text-[10px] leading-relaxed tracking-wider text-fg">
+          // {generator.error}
+        </p>
+      )}
       <div className="relative">
       <HighlightedTextArea
         value={carrier}

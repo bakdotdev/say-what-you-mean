@@ -1,0 +1,134 @@
+/**
+ * Writes a mundane, human-readable paragraph to use as a carrier.
+ *
+ * Deliberately boring: the whole point is text nobody looks twice at. The
+ * model gets a topic and a word count; the codec then decides which few words
+ * must change, and /api/rewrite picks the replacements. Generation itself
+ * carries no constraint, which is what keeps the prose natural.
+ *
+ * Protections mirror /api/rewrite: same-origin only, capped output, per-IP
+ * token bucket.
+ */
+
+export const config = { runtime: "edge" }
+
+const MODEL = "anthropic/claude-haiku-4.5"
+const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
+
+const MIN_WORDS = 60
+const MAX_WORDS = 320
+
+const RATE_CAPACITY = 8
+const RATE_WINDOW_MS = 60_000
+const buckets = new Map()
+
+const allowed = (ip) => {
+  const now = Date.now()
+  const bucket = buckets.get(ip)
+  if (!bucket || now - bucket.start > RATE_WINDOW_MS) {
+    buckets.set(ip, { start: now, count: 1 })
+    if (buckets.size > 5000) buckets.clear()
+    return true
+  }
+  bucket.count += 1
+  return bucket.count <= RATE_CAPACITY
+}
+
+const SYSTEM = `You write short, utterly ordinary prose — the kind of thing
+someone types without thinking. A note about their day, an errand, the
+weather, a small domestic detail.
+
+Rules:
+- Plain everyday vocabulary. Common words, simple sentences.
+- No names of real people, no places that identify anyone, no numbers that
+  look like data. Nothing memorable or quotable.
+- No lists, headings, quotes, emoji or markdown. Just flowing sentences.
+- Do not mention writing, messages, secrets, codes or this task.
+- Return ONLY the paragraph text.`
+
+const json = (value, status = 200) =>
+  new Response(JSON.stringify(value), {
+    status,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  })
+
+export default async function handler(req) {
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405)
+
+  const origin = req.headers.get("origin")
+  if (origin) {
+    try {
+      if (new URL(origin).host !== new URL(req.url).host) {
+        return json({ error: "forbidden" }, 403)
+      }
+    } catch {
+      return json({ error: "forbidden" }, 403)
+    }
+  }
+
+  const ip =
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  if (!allowed(ip)) return json({ error: "rate limited — try again shortly" }, 429)
+
+  const key = process.env.AI_GATEWAY_API_KEY
+  if (!key) return json({ error: "AI_GATEWAY_API_KEY not configured" }, 500)
+
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return json({ error: "invalid json" }, 400)
+  }
+
+  const words = Math.min(
+    MAX_WORDS,
+    Math.max(MIN_WORDS, Number(body?.words) || 160),
+  )
+  const topic = String(body?.topic ?? "an ordinary afternoon").slice(0, 80)
+
+  try {
+    const res = await fetch(GATEWAY, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${key}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1200,
+        temperature: 0.9,
+        messages: [
+          { role: "system", content: SYSTEM },
+          {
+            role: "user",
+            content: `Write about ${topic}. Aim for roughly ${words} words — it is better to run slightly long than short.`,
+          },
+        ],
+      }),
+    })
+
+    if (!res.ok) {
+      const detail = await res.text()
+      return json(
+        { error: `gateway ${res.status}`, detail: detail.slice(0, 300) },
+        502,
+      )
+    }
+
+    const data = await res.json()
+    const text = (data.choices?.[0]?.message?.content ?? "")
+      .replace(/^["'\s]+|["'\s]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+    if (!text) return json({ error: "empty completion" }, 502)
+
+    return json({ carrier: text })
+  } catch (err) {
+    return json(
+      { error: err instanceof Error ? err.message : "request failed" },
+      502,
+    )
+  }
+}
