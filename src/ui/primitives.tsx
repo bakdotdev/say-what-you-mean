@@ -1,4 +1,5 @@
 /** Terminal-style primitives: monospace, amber, square edges. */
+import { useState } from "react"
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -55,7 +56,7 @@ export function Field({
 }
 
 const inputBase =
-  "w-full border border-edge bg-panel px-2.5 py-1.5 text-fg caret-accent outline-none placeholder:text-muted/60 focus:border-accent"
+  "w-full border border-edge bg-panel px-2.5 py-1.5 pr-14 text-fg caret-accent outline-none placeholder:text-muted/60 focus:border-accent"
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cx(inputBase, props.className)} />
@@ -148,5 +149,38 @@ export function Panel({
       </header>
       <div className="p-3">{children}</div>
     </section>
+  )
+}
+
+/** Input with an inline copy button that never overlaps the text. */
+export function CopyableField({
+  value,
+  children,
+  label = "copy",
+}: {
+  value: string
+  children: ReactNode
+  label?: string
+}) {
+  const [done, setDone] = useState(false)
+  const copy = async () => {
+    if (!value) return
+    await navigator.clipboard.writeText(value)
+    setDone(true)
+    setTimeout(() => setDone(false), 1200)
+  }
+  return (
+    <div className="relative">
+      {children}
+      <button
+        type="button"
+        onClick={copy}
+        disabled={!value}
+        aria-label={label}
+        className="absolute right-1 top-1 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30"
+      >
+        {done ? "✓" : "copy"}
+      </button>
+    </div>
   )
 }

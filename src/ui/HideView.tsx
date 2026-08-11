@@ -1,90 +1,71 @@
-import { useEffect, useMemo, useState } from "react"
-import {
-  normalizeSecret,
-  MAX_SECRET_LENGTH,
-  DENSITY_PRESETS,
-  FEATURE_METHODS,
-  tokenizeSpans,
-} from "../codec"
-import { useEncoder } from "./useEncoder"
+import { useCallback, useMemo, useState } from "react"
+import { normalizeSecret, MAX_SECRET_LENGTH, tokenizeSpans } from "../codec"
+import { useMatrixPlan, applyPlan } from "./useMatrixPlan"
 import { useVocabulary } from "./useWordlist"
-import { Button, Field, Meter, Panel, Tag, TextInput } from "./primitives"
+import {
+  Button,
+  CopyableField,
+  Field,
+  Meter,
+  Panel,
+  Tag,
+  TextInput,
+} from "./primitives"
 import { HighlightedTextArea, type Mark } from "./HighlightedTextArea"
-import { WordInspector } from "./WordInspector"
 import { Columns } from "./Columns"
 import { About } from "./About"
+import { SwapPicker } from "./SwapPicker"
+import { Telemetry } from "./Telemetry"
 
-const DENSITY_LABELS: Record<number, { name: string; blurb: string }> = {
-  1: { name: "FREEST", blurb: "~50% of words fit · longest carrier" },
-  2: { name: "BALANCED", blurb: "~25% of words fit · medium carrier" },
-  3: { name: "COMPACT", blurb: "~12% of words fit · short carrier" },
-  4: { name: "TIGHTEST", blurb: "~6% of words fit · shortest carrier" },
-}
-
-export function HideView({ tabs }: { tabs: React.ReactNode }) {
+export function HideView() {
   const [secret, setSecret] = useState("")
   const [passphrase, setPassphrase] = useState("")
   const [carrier, setCarrier] = useState("")
-  const [inspecting, setInspecting] = useState<number | null>(null)
+  const [locked, setLocked] = useState<number[]>([])
   const [copied, setCopied] = useState(false)
-  const [density, setDensity] = useState<number>(DENSITY_PRESETS.balanced)
+  const [applying, setApplying] = useState(false)
+  const [picking, setPicking] = useState<number | null>(null)
 
-  const { encoder, state, error } = useEncoder(
-    secret,
-    passphrase,
-    carrier,
-    density,
-  )
   const vocabulary = useVocabulary()
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [shuffle, setShuffle] = useState(0)
+  const status = useMatrixPlan(secret, passphrase, carrier, locked)
+  const spans = useMemo(() => tokenizeSpans(carrier), [carrier])
 
-  // Scan the vocabulary on demand — hashes lazily and stops at the limit, so a
-  // ~360k-word list costs a few hundred HMACs instead of over a million.
-  useEffect(() => {
-    if (!encoder || vocabulary.length === 0) {
-      setSuggestions([])
-      return
-    }
-    let cancelled = false
-    const offset = shuffle % vocabulary.length
-    const timer = setTimeout(() => {
-      encoder
-        .suggestFrom(carrier, vocabulary, 12, offset)
-        .then((words) => {
-          if (!cancelled) setSuggestions(words)
-        })
-        .catch(() => {
-          if (!cancelled) setSuggestions([])
-        })
-    }, 180)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [encoder, vocabulary, carrier, shuffle])
+  const flips = useMemo(() => status.plan?.flips ?? [], [status.plan])
+  const flipSet = useMemo(() => new Set(flips), [flips])
+  const lockedSet = useMemo(() => new Set(locked), [locked])
 
-  // Box the words that are actually carrying the payload, in place, as the
-  // author types. Offsets come from the same tokenizer the codec uses.
-  const marks: Mark[] = useMemo(() => {
-    if (!state) return []
-    const spans = tokenizeSpans(carrier)
-    const out: Mark[] = []
-    spans.forEach((span, i) => {
-      const report = state.words[i]
-      if (report?.green) {
-        out.push({ start: span.start, end: span.end, kind: "carrier" })
-      }
-    })
-    return out
-  }, [state, carrier])
+  // Box locked words solidly and to-be-swapped words dimly, in place.
+  const marks: Mark[] = useMemo(
+    () =>
+      spans.flatMap<Mark>((span, i) => {
+        if (lockedSet.has(i))
+          return [{ start: span.start, end: span.end, kind: "locked" }]
+        if (flipSet.has(i))
+          return [{ start: span.start, end: span.end, kind: "carrier" }]
+        return []
+      }),
+    [spans, flipSet, lockedSet],
+  )
+
+  const toggleLock = useCallback((slot: number) => {
+    setLocked((prev) =>
+      prev.includes(slot) ? prev.filter((i) => i !== slot) : [...prev, slot],
+    )
+  }, [])
 
   const onSecret = (raw: string) =>
     setSecret(normalizeSecret(raw).slice(0, MAX_SECRET_LENGTH))
 
-  const appendWord = (word: string) => {
-    setCarrier((c) => (c.trim() ? `${c.trimEnd()} ${word}` : word))
-    setCopied(false)
+  const apply = async () => {
+    if (flips.length === 0) return
+    setApplying(true)
+    try {
+      const next = await applyPlan(carrier, flips, passphrase, vocabulary)
+      setCarrier(next)
+      setCopied(false)
+    } finally {
+      setApplying(false)
+    }
   }
 
   const copy = async () => {
@@ -93,74 +74,60 @@ export function HideView({ tabs }: { tabs: React.ReactNode }) {
   }
 
   const ready = Boolean(secret && passphrase)
-  const solved = state?.solved ?? false
-  const info = DENSITY_LABELS[density]
 
   const encodingPanel = (
-      <Panel
-        title="encoding"
-        right={
-          <span className="text-[10px] tracking-wider text-muted">
-            {density}/{FEATURE_METHODS.length} methods
-          </span>
-        }
-      >
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted">
-            density
-          </span>
-          <span className="text-[10px] tracking-wider text-fg-dim">
-            {info.name} · {info.blurb}
-          </span>
+    <Panel
+      title="encoding"
+      right={
+        <span className="text-[10px] tracking-wider text-muted">matrix</span>
+      }
+    >
+      <p className="text-[10px] leading-relaxed tracking-wider text-muted">
+        // syndrome coding: the whole paragraph is one codeword, and only the
+        minimum-weight correction changes. most of your text is left exactly as
+        written.
+      </p>
+      <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
+        <div className="flex justify-between">
+          <dt className="text-muted">payload</dt>
+          <dd className="text-fg">{status.bits || "—"} bits</dd>
         </div>
-        <input
-          type="range"
-          min={1}
-          max={4}
-          step={1}
-          value={density}
-          onChange={(e) => setDensity(Number(e.target.value))}
-          aria-label="Density: writing freedom vs carrier length"
-          className="w-full"
-        />
-        <div className="mt-1.5 flex justify-between text-[9px] uppercase tracking-[0.18em] text-muted">
-          <span>← write freely</span>
-          <span>shorter text →</span>
+        <div className="flex justify-between">
+          <dt className="text-muted">words</dt>
+          <dd className="text-fg">{status.words}</dd>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {FEATURE_METHODS.map((m, i) => (
-            <span
-              key={m.id}
-              title={m.describe}
-              className={
-                "border px-1.5 py-0.5 text-[10px] tracking-wider " +
-                (i < density
-                  ? "border-fg/60 bg-accent/15 text-fg"
-                  : "border-edge text-muted/50")
-              }
-            >
-              {m.label}
-            </span>
-          ))}
+        <div className="flex justify-between">
+          <dt className="text-muted">locked</dt>
+          <dd className="text-fg">{locked.length}</dd>
         </div>
-      </Panel>
+      </dl>
+      {locked.length > 0 && (
+        <button
+          onClick={() => setLocked([])}
+          className="mt-2 w-full border border-edge px-2 py-1 text-[10px] uppercase tracking-wider text-muted hover:border-accent hover:text-fg"
+        >
+          unlock all
+        </button>
+      )}
+    </Panel>
   )
 
   const payloadPanel = (
-      <Panel title="payload">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="secret message"
-            hint={`${secret.length}/${MAX_SECRET_LENGTH}`}
-          >
-            <TextInput
-              value={secret}
-              onChange={(e) => onSecret(e.target.value)}
-              placeholder="MEET AT 8"
-              aria-label="Secret message"
-            />
-          </Field>
-          <Field label="shared passphrase">
+    <Panel title="payload">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="secret message"
+          hint={`${secret.length}/${MAX_SECRET_LENGTH}`}
+        >
+          <TextInput
+            value={secret}
+            onChange={(e) => onSecret(e.target.value)}
+            placeholder="DOCK AT 9"
+            aria-label="Secret message"
+          />
+        </Field>
+        <Field label="shared passphrase">
+          <CopyableField value={passphrase} label="copy passphrase">
             <TextInput
               type="password"
               value={passphrase}
@@ -168,209 +135,198 @@ export function HideView({ tabs }: { tabs: React.ReactNode }) {
               placeholder="known to both parties"
               aria-label="Shared passphrase"
             />
-          </Field>
-        </div>
-      </Panel>
+          </CopyableField>
+        </Field>
+      </div>
+    </Panel>
   )
 
   const carrierPanel = (
-      <Panel
-        title="carrier"
-        right={
-          state ? (
-            <span className="text-[10px] tracking-wider text-muted">
-              {state.greenCount}/{state.tokens.length} words fit
-            </span>
-          ) : undefined
+    <Panel
+      title="carrier"
+      right={
+        ready ? (
+          <span className="text-[10px] tracking-wider text-muted">
+            {status.embedded
+              ? "embedded"
+              : `${flips.length} to swap of ${status.words}`}
+          </span>
+        ) : undefined
+      }
+    >
+      <div className="relative">
+      <HighlightedTextArea
+        value={carrier}
+        onChange={(next) => {
+          setCarrier(next)
+          setCopied(false)
+        }}
+        marks={marks}
+        rows={10}
+        placeholder={
+          ready
+            ? "Paste or write anything. Only the boxed words need swapping — the rest stays exactly as you wrote it."
+            : "Enter a secret and passphrase to begin."
         }
-      >
-        <HighlightedTextArea
-          value={carrier}
-          onChange={(next) => {
-            setCarrier(next)
-            setCopied(false)
-          }}
-          marks={marks}
-          rows={6}
-          placeholder={
-            ready
-              ? "Write ordinary sentences. Boxed words are carrying the message — keep those."
-              : "Enter a secret and passphrase to begin."
-          }
-          disabled={!ready}
-          ariaLabel="Carrier text"
-        />
-      </Panel>
+        disabled={!ready}
+        ariaLabel="Carrier text"
+      />
+        <button
+          type="button"
+          onClick={copy}
+          disabled={!carrier}
+          aria-label="copy carrier"
+          className="absolute right-2 top-2 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30"
+        >
+          {copied ? "✓" : "copy"}
+        </button>
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
+        // boxed = must change · solid box = locked · click a word to swap or lock
+      </p>
+    </Panel>
   )
 
-  const errorPanel = error ? (
-    <p className="border border-fg/50 bg-accent/10 px-3 py-2 text-xs text-fg">
-      {error}
-    </p>
-  ) : null
-
-  const analysis =
-    ready && state ? (
-        <>
-          <StatusPanel
-            solved={solved}
-            determined={state.determinedBits}
-            total={state.totalBits}
-            redCount={state.redCount}
-            survivable={state.survivableDeletions}
-            equations={state.usableEquations}
-          />
-
-          {state.words.length > 0 && (
-            <Panel title="word map">
-              <div className="flex flex-wrap gap-1">
-                {state.words.map((w, i) => (
-                  <button
-                    key={i}
-                    data-flag={w.green ? "green" : "red"}
-                    title={`${w.satisfied}/${w.total} methods fit`}
-                    onClick={() => setInspecting(i)}
-                    className={
-                      "border px-1.5 py-0.5 text-xs normal-case text-fg transition-opacity " +
-                      (w.green
-                        ? "border-fg/50 bg-accent/15 opacity-100"
-                        : "border-fg/20 bg-transparent opacity-20 hover:opacity-50")
-                    }
-                  >
-                    {w.word}
-                  </button>
-                ))}
-              </div>
-              {inspecting !== null && encoder && state.words[inspecting] && (
-                <div className="mt-3">
-                  <WordInspector
-                    report={state.words[inspecting]}
-                    encoder={encoder}
-                    onClose={() => setInspecting(null)}
-                  />
-                </div>
-              )}
-            </Panel>
-          )}
-
-          {suggestions.length > 0 && !solved && (
-            <Panel
-              title="candidates"
-              right={
-                <button
-                  onClick={() => setShuffle((n) => n + 977)}
-                  className="text-[10px] uppercase tracking-wider text-muted hover:text-fg"
-                >
-                  more ↻
-                </button>
-              }
-            >
-              <div className="flex flex-wrap gap-1">
-                {suggestions.map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => appendWord(w)}
-                    className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs normal-case text-fg-dim hover:border-accent hover:text-fg"
-                  >
-                    {w}
-                  </button>
-                ))}
-              </div>
-            </Panel>
-          )}
-
-          <div className="space-y-1.5">
-            <Button onClick={copy} disabled={!solved} className="w-full">
-              {copied ? "copied ✓" : "copy carrier"}
-            </Button>
-            {!solved && (
-              <span className="block text-[10px] leading-relaxed tracking-wider text-muted">
-                locked until payload is fully embedded
-              </span>
-            )}
-          </div>
-        </>
-    ) : null
-
-  return (
-    <Columns
-      left={
-        <>
-          {tabs}
-          {encodingPanel}
-        </>
-      }
-      center={
-        <>
-          {payloadPanel}
-          {carrierPanel}
-          {errorPanel}
-          <About />
-        </>
-      }
-      right={analysis}
-    />
-  )
-}
-
-function StatusPanel({
-  solved,
-  determined,
-  total,
-  redCount,
-  survivable,
-  equations,
-}: {
-  solved: boolean
-  determined: number
-  total: number
-  redCount: number
-  survivable: number
-  equations: number
-}) {
-  return (
+  const statusPanel = ready ? (
     <Panel
       title="status"
       right={
-        solved ? (
+        status.busy ? (
+          <Tag>working</Tag>
+        ) : status.problem ? (
+          <Tag tone="red">blocked</Tag>
+        ) : status.embedded ? (
           <Tag tone="green">embedded</Tag>
-        ) : redCount > 0 ? (
-          <Tag tone="red">{redCount} to replace</Tag>
         ) : (
-          <Tag>incomplete</Tag>
+          <Tag>{flips.length} swaps</Tag>
         )
       }
     >
       <Meter
-        value={solved ? survivable + total : determined}
-        max={solved ? survivable + total : total}
-        tone={solved ? "green" : "accent"}
+        value={status.embedded ? 1 : status.words}
+        max={status.embedded ? 1 : Math.max(status.words, status.bits + 1)}
+        tone={status.embedded ? "green" : "accent"}
       />
-      <dl className="mt-2 grid grid-cols-3 gap-2 text-[10px] tracking-wider">
-        <div>
-          <dt className="text-muted">bits</dt>
-          <dd className="text-fg">
-            {determined}/{total}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted">equations</dt>
-          <dd className="text-fg">{equations}</dd>
-        </div>
-        <div>
-          <dt className="text-muted">deletions survived</dt>
-          <dd className={solved ? "text-fg" : "text-muted"}>
-            {solved ? `~${survivable}` : "—"}
-          </dd>
-        </div>
-      </dl>
-      <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-        {solved
-          ? "// keep writing to raise durability — more words survive more deletions"
-          : redCount > 0
-            ? "// highlighted words contradict the payload; swap them out"
-            : "// add more fitting words until every payload bit is covered"}
-      </p>
+      {status.problem ? (
+        <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-fg">
+          // {status.problem}
+        </p>
+      ) : (
+        <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
+          {status.embedded
+            ? "// this text carries the message. copy it."
+            : `// swap the ${flips.length} boxed words, or apply automatically`}
+        </p>
+      )}
+      <div className="mt-3 space-y-1.5">
+        <Button
+          onClick={apply}
+          disabled={status.embedded || flips.length === 0 || applying}
+          className="w-full"
+        >
+          {applying ? "applying…" : `apply ${flips.length} swaps`}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={copy}
+          disabled={!status.embedded}
+          className="w-full"
+        >
+          {copied ? "copied ✓" : "copy carrier"}
+        </Button>
+      </div>
     </Panel>
+  ) : null
+
+  const wordPanel =
+    ready && spans.length > 0 ? (
+      <Panel
+        title="word map"
+        right={
+          <span className="text-[10px] tracking-wider text-muted">
+            click to lock
+          </span>
+        }
+      >
+        <div className="flex flex-wrap gap-1">
+          {spans.map((span, i) => {
+            const isLocked = lockedSet.has(i)
+            const isFlip = flipSet.has(i)
+            return (
+              <button
+                key={i}
+                onClick={(e) => {
+                  if (e.altKey || e.shiftKey || isLocked) toggleLock(i)
+                  else if (isFlip) setPicking(i)
+                  else toggleLock(i)
+                }}
+                title={
+                  isLocked
+                    ? "locked — never swapped"
+                    : isFlip
+                      ? "needs swapping"
+                      : "kept as written"
+                }
+                className={
+                  "border px-1.5 py-0.5 text-xs normal-case text-fg transition-opacity " +
+                  (isLocked
+                    ? "border-fg bg-accent/25 opacity-100"
+                    : isFlip
+                      ? "border-fg/50 bg-accent/10 opacity-100"
+                      : "border-fg/20 opacity-20 hover:opacity-50")
+                }
+              >
+                {span.word}
+              </button>
+            )
+          })}
+        </div>
+      </Panel>
+    ) : null
+
+  return (
+    <Columns
+      left={encodingPanel}
+      center={
+        <>
+          {payloadPanel}
+          {carrierPanel}
+          <About />
+        </>
+      }
+      right={
+        <>
+          {statusPanel}
+          {picking !== null && spans[picking] && (
+            <SwapPicker
+              word={spans[picking].word}
+              passphrase={passphrase}
+              vocabulary={vocabulary}
+              onPick={(replacement) => {
+                const span = spans[picking]
+                setCarrier(
+                  carrier.slice(0, span.start) +
+                    replacement +
+                    carrier.slice(span.end),
+                )
+                setPicking(null)
+                setCopied(false)
+              }}
+              onClose={() => setPicking(null)}
+            />
+          )}
+          {wordPanel}
+          {ready && (
+            <Telemetry
+              carrier={carrier}
+              passphrase={passphrase}
+              bits={status.bits}
+              flips={flips.length}
+              locked={locked.length}
+            />
+          )}
+        </>
+      }
+    />
   )
 }

@@ -17,7 +17,7 @@ export function App() {
     <div
       role="tablist"
       aria-label="Mode"
-      className="flex border border-edge lg:flex-col"
+      className="flex w-full border border-edge"
     >
       {TABS.map((t, i) => (
         <button
@@ -27,7 +27,7 @@ export function App() {
           onClick={() => setTab(t.id)}
           className={
             "flex flex-1 items-center justify-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors " +
-            (i > 0 ? "border-l border-edge lg:border-l-0 lg:border-t " : "") +
+            (i > 0 ? "border-l border-edge " : "") +
             (tab === t.id
               ? "bg-accent/15 text-fg"
               : "bg-panel text-muted hover:text-fg-dim")
@@ -51,17 +51,14 @@ export function App() {
             <span className="text-[10px] tracking-wider text-muted">v1</span>
           </div>
           <p className="mt-1 text-[11px] leading-relaxed tracking-wider text-muted">
-            // coverless steganography — your exact words, read through a shared
-            key. no hidden characters.
+            // hide a short message inside text you write yourself — see readme
           </p>
         </header>
 
+        <div className="mb-3">{tabs}</div>
+
         <section aria-live="polite">
-          {tab === "hide" ? (
-            <HideView tabs={tabs} />
-          ) : (
-            <RevealView tabs={tabs} />
-          )}
+          {tab === "hide" ? <HideView /> : <RevealView />}
         </section>
       </main>
     </PageEffect>

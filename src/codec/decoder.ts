@@ -10,6 +10,7 @@
  * before doing any linear algebra.
  */
 import { tokenize } from "./tokenize"
+import { extractPayload } from "./matrix"
 import { deriveKeys } from "./keys"
 import { parsePayload, payloadBitLength } from "./payload"
 import {
@@ -75,8 +76,23 @@ export const decode = async (
   for (const w of distinct) digestMap.set(w, await wordDigests(w, keys))
   const perToken = tokens.map((t) => digestMap.get(t)!)
 
+  // Matrix embedding first: read the syndrome directly and MAC-check each
+  // candidate secret length. This is the scheme the Hide view now uses.
+  for (let n = 1; n <= MAX_SECRET_LENGTH; n++) {
+    const B = payloadBitLength(n)
+    const bits = await extractPayload(text, B, keys)
+    const parsed = await parsePayload(bits, n, keys)
+    if (parsed) {
+      return {
+        secret: parsed.secret,
+        diagnostics: { ...base, equations: tokens.length, density: 0,
+          bitsRecovered: B, bitsTotal: B },
+      }
+    }
+  }
+
   let best: Diagnostics = base
-  // Prefer higher density (more equations, fastest solve) but try all.
+  // Legacy per-word scheme: try each density (older carriers still decode).
   for (let density = MAX_DENSITY; density >= 1; density--) {
     for (let n = 1; n <= MAX_SECRET_LENGTH; n++) {
       const B = payloadBitLength(n)

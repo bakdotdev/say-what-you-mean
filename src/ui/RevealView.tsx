@@ -5,7 +5,7 @@ import { RevealOutput } from "./RevealOutput"
 import { Columns } from "./Columns"
 import { About } from "./About"
 
-export function RevealView({ tabs }: { tabs: React.ReactNode }) {
+export function RevealView() {
   const [carrier, setCarrier] = useState("")
   const [passphrase, setPassphrase] = useState("")
   const [result, setResult] = useState<DecodeResult | null>(null)
@@ -103,7 +103,15 @@ export function RevealView({ tabs }: { tabs: React.ReactNode }) {
 
   return (
     <Columns
-      left={tabs}
+      left={
+        <Panel title="about">
+          <p className="text-[10px] leading-relaxed tracking-wider text-muted">
+            // paste the text you received and enter the shared passphrase. the
+            decoder recomputes every word's keyed clues and reassembles the
+            payload; missing or reordered words are tolerated.
+          </p>
+        </Panel>
+      }
       center={
         <>
           {carrierPanel}
