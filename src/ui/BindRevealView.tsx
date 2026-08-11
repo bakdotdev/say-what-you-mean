@@ -105,7 +105,7 @@ export function BindRevealView() {
             />
           </Panel>
 
-          <Panel title="key">
+          <Panel title="passphrase">
             <Field label="shared passphrase">
               <CopyableField value={passphrase} label="copy passphrase">
                 <TextInput

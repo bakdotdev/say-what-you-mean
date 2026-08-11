@@ -107,8 +107,9 @@ export function BindHideView() {
           right={<span className="text-[10px] tracking-wider text-muted">bound</span>}
         >
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            a pad is derived from your passphrase and the words themselves,
-            then solved directly for the key. no search, no word changes.
+            your message is encrypted against a pad derived from the
+            passphrase and the words themselves. the words are never changed —
+            the encrypted result goes to escrow, not into the text.
           </p>
           <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
             <div className="flex justify-between">

@@ -12,8 +12,16 @@ const TABS: { id: "hide" | "reveal"; label: string; glyph: string }[] = [
 ]
 
 const VERSIONS: { id: "v1" | "v2"; label: string; blurb: string }[] = [
-  { id: "v1", label: "v1", blurb: "swaps words · nothing else to send" },
-  { id: "v2", label: "v2", blurb: "text untouched · short key travels with it" },
+  {
+    id: "v1",
+    label: "v1",
+    blurb: "the message is hidden in the words · a passphrase unlocks it",
+  },
+  {
+    id: "v2",
+    label: "v2",
+    blurb: "the words are never touched · they unlock a one-read key",
+  },
 ]
 
 export function App() {

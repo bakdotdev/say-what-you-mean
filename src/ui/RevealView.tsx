@@ -48,7 +48,7 @@ export function RevealView() {
   )
 
   const keyPanel = (
-      <Panel title="key">
+      <Panel title="passphrase">
         <Field label="shared passphrase">
           <TextInput
             type="password"
@@ -109,8 +109,9 @@ export function RevealView() {
       left={
         <Panel title="about">
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            paste the text you received and enter the shared passphrase.
-            missing or reordered words are tolerated.
+            the message is hidden in the words themselves. paste the text you
+            received and enter the passphrase it was written with — nothing
+            else is needed. missing or reordered words are tolerated.
           </p>
         </Panel>
       }

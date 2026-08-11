@@ -6,7 +6,10 @@ export function Instructions({ durable }: { durable: boolean }) {
         how to use
       </summary>
       <ol className="list-inside list-decimal space-y-1.5 border-t border-edge px-3 py-3">
-        <li>Enter a short secret and a passphrase you both know.</li>
+        <li>
+          Enter a short secret and a passphrase you both know. The passphrase
+          is the only thing you have to agree on beforehand — there is no key.
+        </li>
         <li>
           Write or paste a paragraph, or press{" "}
           <span className="text-fg-dim">generate a carrier for me</span>.
@@ -19,7 +22,10 @@ export function Instructions({ durable }: { durable: boolean }) {
         <li>
           Click a word to lock it if it must stay exactly as written.
         </li>
-        <li>Copy the text and send it. The passphrase goes separately.</li>
+        <li>
+          Copy the text and send it. The message travels inside those words;
+          the passphrase reaches them some other way.
+        </li>
       </ol>
     </details>
   )
