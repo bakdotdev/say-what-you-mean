@@ -56,7 +56,7 @@ export function WordInspector({
       {equations ? (
         <div className="space-y-2 tracking-wider text-muted">
           <p>
-            // {equations.length} independent{" "}
+            {equations.length} independent{" "}
             {equations.length === 1 ? "reading" : "readings"} of this word:
           </p>
           <ul className="space-y-1">
@@ -74,12 +74,12 @@ export function WordInspector({
           </ul>
           <p>
             {report.green
-              ? "// all agree with the payload — word is usable"
-              : "// at least one disagrees — pick a different word"}
+              ? "all agree with the payload — word is usable"
+              : "at least one disagrees — pick a different word"}
           </p>
         </div>
       ) : (
-        <p className="tracking-wider text-muted">// computing…</p>
+        <p className="tracking-wider text-muted">computing…</p>
       )}
     </div>
   )

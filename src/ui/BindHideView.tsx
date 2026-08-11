@@ -106,7 +106,7 @@ export function BindHideView() {
           right={<span className="text-[10px] tracking-wider text-muted">bound</span>}
         >
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            // a pad is derived from your passphrase and the words themselves,
+            a pad is derived from your passphrase and the words themselves,
             then solved directly for the key. no search, no word changes.
           </p>
           <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
@@ -177,7 +177,7 @@ export function BindHideView() {
               />
             </CopyableField>
             <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-              // case, spacing and punctuation may change in transit; words may not
+              case, spacing and punctuation may change in transit; words may not
             </p>
           </Panel>
 
@@ -188,7 +188,7 @@ export function BindHideView() {
         <>
           {error && (
             <Panel title="error">
-              <p className="text-[10px] tracking-wider text-fg">// {error}</p>
+              <p className="text-[10px] tracking-wider text-fg">{error}</p>
             </Panel>
           )}
           <Panel
@@ -207,12 +207,12 @@ export function BindHideView() {
           >
             <p className="text-[10px] leading-relaxed tracking-wider text-muted">
               {escrow === "sent"
-                ? "// send the carrier text. your recipient needs only that and the passphrase."
+                ? "send the carrier text. your recipient needs only that and the passphrase."
                 : escrow === "sending"
-                  ? "// storing…"
+                  ? "storing…"
                   : escrow === "failed"
-                    ? `// ${escrowError ?? "could not store"}`
-                    : "// enter a secret, a passphrase and some carrier text"}
+                    ? `${escrowError ?? "could not store"}`
+                    : "enter a secret, a passphrase and some carrier text"}
             </p>
           </Panel>
 

@@ -167,8 +167,8 @@ export function HideView({
       </div>
       <p className="text-[10px] leading-relaxed tracking-wider text-muted">
         {durable
-          ? "// every word carries its own clue, so deleting or reordering words just drops clues and the rest still reconstruct the message. altering a word does break it. costs about twice the length."
-          : "// syndrome coding: the whole paragraph is one codeword and only the minimum-weight correction changes. shortest carrier, but word edits break it."}
+          ? "Survives deleted or reordered words. Needs about twice the length."
+          : "Shortest carrier. Any word edit breaks it."}
       </p>
       <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
         <div className="flex justify-between">
@@ -248,8 +248,8 @@ export function HideView({
         rows={10}
         placeholder={
           ready
-            ? "Paste or write anything. Only the boxed words need swapping — the rest stays exactly as you wrote it."
-            : "Enter a secret and passphrase to begin."
+            ? "Write or paste anything."
+            : "Enter a secret and passphrase."
         }
         disabled={!ready}
         ariaLabel="Carrier text"
@@ -271,7 +271,7 @@ export function HideView({
           </span>
           LOCKED BY YOU
         </span>
-        <span>// CLICK ANY WORD TO LOCK IT</span>
+        <span>CLICK TO LOCK</span>
       </div>
       <Button
         variant={embedded ? "ready" : "ghost"}
@@ -299,23 +299,7 @@ export function HideView({
         )
       }
     >
-      <Meter
-        value={embedded ? 1 : status.words}
-        max={embedded ? 1 : Math.max(status.words, status.bits + 1)}
-        tone={embedded ? "green" : "accent"}
-      />
-      {status.problem ? (
-        <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-fg">
-          // {status.problem}
-        </p>
-      ) : (
-        <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-          {embedded
-            ? "// this text carries the message. copy it."
-            : `// swap the ${flips.length} boxed words, or apply automatically`}
-        </p>
-      )}
-      <div className="mt-3 space-y-1.5">
+      <div className="space-y-1.5">
         <Button
           onClick={generateCarrier}
           disabled={generator.busy || durableGen.busy}
@@ -327,7 +311,7 @@ export function HideView({
         </Button>
         {(generator.error || durableGen.error) && (
           <p className="text-[10px] leading-relaxed tracking-wider text-fg">
-            // {generator.error ?? durableGen.error}
+            {generator.error ?? durableGen.error}
           </p>
         )}
         <Button
@@ -335,11 +319,11 @@ export function HideView({
           disabled={embedded || flips.length === 0 || ai.busy || durable}
           className="w-full"
         >
-          {ai.busy ? "choosing words…" : "pick words naturally · ai"}
+          {ai.busy ? "choosing…" : "pick words naturally"}
         </Button>
         {ai.error && (
           <p className="text-[10px] leading-relaxed tracking-wider text-fg">
-            // {ai.error}
+            {ai.error}
           </p>
         )}
         <Button
@@ -352,6 +336,20 @@ export function HideView({
         </Button>
 
       </div>
+
+      <Meter
+        value={embedded ? 1 : status.words}
+        max={embedded ? 1 : Math.max(status.words, status.bits + 1)}
+        tone={embedded ? "green" : "accent"}
+        segments={28}
+      />
+      <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
+        {status.problem
+          ? status.problem
+          : embedded
+            ? "Ready to copy."
+            : `${flips.length} words to change.`}
+      </p>
     </Panel>
   ) : null
 

@@ -72,15 +72,15 @@ export function SwapPicker({
       }
     >
       {candidates === null ? (
-        <p className="text-[10px] tracking-wider text-muted">// searching…</p>
+        <p className="text-[10px] tracking-wider text-muted">searching…</p>
       ) : candidates.length === 0 ? (
         <p className="text-[10px] tracking-wider text-muted">
-          // no candidate found
+          no candidate found
         </p>
       ) : (
         <>
           <p className="mb-2 text-[10px] leading-relaxed tracking-wider text-muted">
-            // any of these satisfies the constraint — pick what you mean
+            any of these satisfies the constraint — pick what you mean
           </p>
           <div className="flex flex-wrap gap-1">
             {candidates.map((c) => (

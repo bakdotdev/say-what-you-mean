@@ -62,7 +62,7 @@ export function RevealView() {
 
   const busyLine =
     busy && !result ? (
-      <p className="text-[10px] tracking-[0.2em] text-muted">// decoding…</p>
+      <p className="text-[10px] tracking-[0.2em] text-muted">decoding…</p>
     ) : null
 
   const outputPanel = result ? (
@@ -106,7 +106,7 @@ export function RevealView() {
       left={
         <Panel title="about">
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            // paste the text you received and enter the shared passphrase. the
+            paste the text you received and enter the shared passphrase. the
             decoder recomputes every word's keyed clues and reassembles the
             payload; missing or reordered words are tolerated.
           </p>

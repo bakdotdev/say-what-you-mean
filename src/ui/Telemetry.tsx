@@ -75,9 +75,9 @@ export function Telemetry({
         />
       </dl>
       <p className="mt-2 border-t border-edge pt-2 text-[9px] leading-relaxed tracking-wider text-muted">
-        // pbkdf2-sha256 300k · hkdf split addr/stream/mac · 16-bit tag
+        pbkdf2-sha256 300k · hkdf split addr/stream/mac · 16-bit tag
         <br />
-        // gf(2) syndrome coding · coset-leader sparsify
+        gf(2) syndrome coding · coset-leader sparsify
       </p>
     </Panel>
   )

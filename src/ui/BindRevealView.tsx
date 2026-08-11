@@ -70,7 +70,7 @@ export function BindRevealView() {
       left={
         <Panel title="decoding" right={<span className="text-[10px] tracking-wider text-muted">bound</span>}>
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            // the carrier words and the passphrase together fetch the key and
+            the carrier words and the passphrase together fetch the key and
             decrypt it. either one wrong and it fails closed.
           </p>
           <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
@@ -117,7 +117,7 @@ export function BindRevealView() {
               </CopyableField>
             </Field>
             <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-              // the key is fetched automatically and destroyed on first read
+              the key is fetched automatically and destroyed on first read
             </p>
           </Panel>
 
@@ -148,8 +148,8 @@ export function BindRevealView() {
           ) : (
             <p className="text-[10px] leading-relaxed tracking-wider text-muted">
               {tried
-                ? "// wrong passphrase, the carrier was edited, or the key was already read"
-                : "// paste the carrier and enter the passphrase"}
+                ? "wrong passphrase, the carrier was edited, or the key was already read"
+                : "paste the carrier and enter the passphrase"}
             </p>
           )}
         </Panel>

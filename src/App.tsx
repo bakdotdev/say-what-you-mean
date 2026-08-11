@@ -87,7 +87,7 @@ export function App() {
             </div>
           </div>
           <p className="mt-1 text-[11px] leading-relaxed tracking-wider text-muted">
-            // {VERSIONS.find((v) => v.id === version)!.blurb} — see readme
+            {VERSIONS.find((v) => v.id === version)!.blurb} — see readme
           </p>
         </header>
 

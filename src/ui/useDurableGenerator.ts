@@ -139,6 +139,30 @@ export function useDurableGenerator() {
 
           const candidate = kept.map((k) => k.sentence).join(" ")
           if ((await encoder.evaluate(candidate)).solved) {
+            // Harvested sentences come from different runs and topics, so they
+            // read as fragments. Ask for one coherent paragraph built ONLY
+            // from words already proven to fit — every word in that pool is
+            // known-good, so the result needs no repair at all.
+            setState({ busy: true, stage: "composing…", error: null })
+            const proven = [
+              ...new Set(
+                tokenizeSpans(candidate)
+                  .map((sp) => sp.word)
+                  .filter((w) => allowedSet.has(w)),
+              ),
+            ]
+            const polished = await composeFrom(
+              `${base}api/generate`,
+              proven,
+              Math.round(tokenizeSpans(candidate).length * 1.15),
+            )
+            if (polished) {
+              const check = await encoder.evaluate(polished)
+              if (check.solved) {
+                setState({ busy: false, stage: "", error: null })
+                return polished
+              }
+            }
             setState({ busy: false, stage: "", error: null })
             return candidate
           }
@@ -181,6 +205,33 @@ export function useDurableGenerator() {
   )
 
   return { ...state, generate }
+}
+
+/**
+ * Ask for a single coherent paragraph using only words already proven to fit.
+ * Returns null on any failure — the caller keeps the harvested text instead.
+ */
+async function composeFrom(
+  endpoint: string,
+  provenWords: readonly string[],
+  words: number,
+): Promise<string | null> {
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        words,
+        topic: "one connected everyday account, start to finish",
+        allowed: provenWords,
+      }),
+    })
+    if (!res.ok) return null
+    const { carrier } = (await res.json()) as { carrier?: string }
+    return carrier ?? null
+  } catch {
+    return null
+  }
 }
 
 /** Last-resort word substitution, used only when harvesting cannot finish. */
