@@ -40,7 +40,7 @@ const COMMON_BAND = 9000
 const RUN_WORDS = 300
 const MAX_RUNS = 8
 /** Keep a sentence only if at most this fraction of its words need changing. */
-const MAX_STRAY_RATIO = 0.2
+const MAX_STRAY_RATIO = 0.5
 const CANDIDATE_POOL = 60
 const OPTIONS_PER_SLOT = 20
 
@@ -120,7 +120,13 @@ export function useDurableGenerator() {
           const res = await fetch(`${base}api/generate`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ words: RUN_WORDS, topic, allowed }),
+            // No allowed-list: measured at 42-47% adherence, which IS chance
+            // given the list is ~half the vocabulary — the models ignore it,
+            // and passing it made Sonnet return empty completions. Junk words
+            // and the function-word exemption already cut the constrained
+            // share to ~23%, so free prose plus a small repair beats a
+            // constraint nobody honours.
+            body: JSON.stringify({ words: RUN_WORDS, topic }),
           })
           if (!res.ok) {
             const detail = (await res.json().catch(() => ({}))) as {

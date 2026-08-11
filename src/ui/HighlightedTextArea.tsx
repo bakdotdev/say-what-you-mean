@@ -47,15 +47,17 @@ export const MARK_STYLES: Record<Mark["kind"], string> = {
   // Fills hug the glyphs exactly — no shadow spread, no padding — so a marked
   // word occupies the same box as an unmarked one and the backdrop stays in
   // register with the textarea.
-  locked: "bg-accent/45",
-  carrier: "bg-accent/15",
   /**
    * Solid amber with dark text. The backdrop sits ABOVE the textarea, so an
    * opaque fill hides the amber glyph underneath and this span's own dark
    * text renders on top — which is why `text-ink` must override the layer's
-   * inherited `text-transparent`.
+   * inherited `text-transparent`. Reserved for locked words, the strongest
+   * statement in the field.
    */
-  required: "bg-accent text-ink",
+  locked: "bg-accent text-ink",
+  carrier: "bg-accent/15",
+  /** Underline only — present but quiet, since most words end up here. */
+  required: "border-b border-accent/60",
   plain: "",
 }
 
