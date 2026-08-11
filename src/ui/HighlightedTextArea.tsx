@@ -17,7 +17,10 @@ import { useLayoutEffect, useRef, type ReactNode } from "react"
 export interface Mark {
   start: number
   end: number
-  /** Locked words get a solid ring; load-bearing ones a dimmer ring. */
+  /**
+   * `carrier` — being changed to carry the payload (faint fill).
+   * `locked`  — you pinned it; the solver will never touch it (stronger fill).
+   */
   kind: "locked" | "carrier"
 }
 
@@ -103,11 +106,13 @@ function renderMarked(text: string, marks: readonly Mark[]): ReactNode[] {
     out.push(
       <span
         key={i}
-        // box-shadow ring: zero layout impact, so line height is unchanged
+        // Background fills only, no borders. box-shadow spreads the fill a
+        // little beyond the glyphs without taking layout space, so the
+        // backdrop stays in exact register with the textarea.
         className={
           m.kind === "locked"
-            ? "rounded-[2px] shadow-[0_0_0_1px_var(--color-fg)]"
-            : "rounded-[2px] shadow-[0_0_0_1px_var(--color-muted)]"
+            ? "rounded-[2px] bg-accent/40 shadow-[0_0_0_2px] shadow-accent/40"
+            : "rounded-[2px] bg-accent/12 shadow-[0_0_0_2px] shadow-accent/12"
         }
       >
         {text.slice(m.start, m.end)}

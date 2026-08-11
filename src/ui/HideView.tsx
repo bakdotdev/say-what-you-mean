@@ -181,22 +181,6 @@ export function HideView() {
         ) : undefined
       }
     >
-      <div className="mb-2 flex items-center gap-2">
-        <Button
-          onClick={generateCarrier}
-          disabled={!ready || generator.busy}
-          className="w-full"
-        >
-          {generator.busy
-            ? generator.stage || "generating…"
-            : "generate a carrier for me"}
-        </Button>
-      </div>
-      {generator.error && (
-        <p className="mb-2 text-[10px] leading-relaxed tracking-wider text-fg">
-          // {generator.error}
-        </p>
-      )}
       <div className="relative">
       <HighlightedTextArea
         value={carrier}
@@ -214,19 +198,18 @@ export function HideView() {
         disabled={!ready}
         ariaLabel="Carrier text"
       />
-        <button
-          type="button"
-          onClick={copy}
-          disabled={!carrier}
-          aria-label="copy carrier"
-          className="absolute right-1.5 top-1.5 border border-edge bg-panel-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-30"
-        >
-          {copied ? "✓" : "copy"}
-        </button>
       </div>
       <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-        // boxed = must change · solid box = locked · click a word to swap or lock
+        // shaded = being changed · solid = locked by you · click any word to lock it
       </p>
+      <Button
+        variant={status.embedded ? "ready" : "ghost"}
+        onClick={copy}
+        disabled={!status.embedded}
+        className="mt-2 w-full"
+      >
+        {copied ? "copied ✓" : "copy carrier"}
+      </Button>
     </Panel>
   )
 
@@ -263,6 +246,20 @@ export function HideView() {
       )}
       <div className="mt-3 space-y-1.5">
         <Button
+          onClick={generateCarrier}
+          disabled={generator.busy}
+          className="w-full"
+        >
+          {generator.busy
+            ? generator.stage || "generating…"
+            : "generate a carrier for me"}
+        </Button>
+        {generator.error && (
+          <p className="text-[10px] leading-relaxed tracking-wider text-fg">
+            // {generator.error}
+          </p>
+        )}
+        <Button
           onClick={aiRewrite}
           disabled={status.embedded || flips.length === 0 || ai.busy}
           className="w-full"
@@ -282,14 +279,7 @@ export function HideView() {
         >
           {applying ? "applying…" : `blunt swap ×${flips.length}`}
         </Button>
-        <Button
-          variant={status.embedded ? "ready" : "ghost"}
-          onClick={copy}
-          disabled={!status.embedded}
-          className="w-full"
-        >
-          {copied ? "copied ✓" : "copy carrier"}
-        </Button>
+
       </div>
     </Panel>
   ) : null
@@ -347,6 +337,7 @@ export function HideView() {
         <>
           {payloadPanel}
           {carrierPanel}
+          {wordPanel}
           <About />
         </>
       }
@@ -371,7 +362,6 @@ export function HideView() {
               onClose={() => setPicking(null)}
             />
           )}
-          {wordPanel}
           {ready && (
             <Telemetry
               carrier={carrier}
