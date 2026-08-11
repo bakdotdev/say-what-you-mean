@@ -71,8 +71,8 @@ export function BindRevealView() {
       left={
         <Panel title="decoding" right={<span className="text-[10px] tracking-wider text-muted">bound</span>}>
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
-            the carrier words and the passphrase together fetch the key and
-            decrypt it. either one wrong and it fails closed.
+            The text and the passphrase together unlock the message. Either
+            one wrong and nothing comes out.
           </p>
           <dl className="mt-2 space-y-1 text-[10px] tracking-wider">
             <div className="flex justify-between">

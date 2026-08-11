@@ -12,13 +12,12 @@ export function Instructions({ durable }: { durable: boolean }) {
           <span className="text-fg-dim">generate a carrier for me</span>.
         </li>
         <li>
-          Change the highlighted words. Only they matter
-          {durable ? " — about one word in three." : "."} Everything unmarked
-          is yours to write freely.
+          Change the highlighted words. Only those are used to decrypt the
+          message{durable ? " — about one word in three" : ""}. Everything
+          unmarked is yours to write freely.
         </li>
         <li>
-          Click a word to lock it if it must stay exactly as written; the
-          solver will leave it alone.
+          Click a word to lock it if it must stay exactly as written.
         </li>
         <li>Copy the text and send it. The passphrase goes separately.</li>
       </ol>

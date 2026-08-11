@@ -98,11 +98,11 @@ export function HideView({
         title: lockedSet.has(i)
           ? "locked — click to unlock"
           : flipSet.has(i)
-            ? "being changed — click to lock it"
+            ? "must change — click to lock instead"
             : junkSet.has(i)
-              ? "free — carries nothing, write anything here"
+              ? "not used — write anything here"
               : hasPlan
-                ? "carrying a clue — click to lock"
+                ? "required to decrypt — click to lock"
                 : "click to lock",
       })),
     [spans, flipSet, lockedSet, hasPlan, junkSet],
@@ -229,8 +229,8 @@ export function HideView({
             </span>
           </button>
           <p className="mt-1.5 text-left text-[10px] leading-relaxed tracking-wider text-muted">
-            Suggests only words that carry nothing, so anything you add stays
-            free.
+            Only suggests words that aren't used for decryption, so anything
+            you add is safe.
           </p>
         </div>
       )}
@@ -316,7 +316,7 @@ export function HideView({
           <span className={`font-mono text-fg ${MARK_STYLES.required}`}>
             WORD
           </span>
-          CARRIES A CLUE
+          REQUIRED TO DECRYPT
         </span>
         <span className="flex items-center gap-2">
           <span className={`font-mono text-fg ${MARK_STYLES.locked}`}>
@@ -326,7 +326,7 @@ export function HideView({
         </span>
         <span className="flex items-center gap-2">
           <span className="font-mono text-muted">WORD</span>
-          FREE TO EDIT
+          NOT USED
         </span>
         <span>CLICK A WORD FOR OPTIONS</span>
       </div>

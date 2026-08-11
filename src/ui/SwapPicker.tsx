@@ -80,7 +80,7 @@ export function SwapPicker({
       ) : (
         <>
           <p className="mb-2 text-[10px] leading-relaxed tracking-wider text-muted">
-            any of these satisfies the constraint — pick what you mean
+            Any of these will work — pick the one you mean.
           </p>
           <div className="flex flex-wrap gap-1">
             {candidates.map((c) => (

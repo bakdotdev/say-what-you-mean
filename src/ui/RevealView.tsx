@@ -110,8 +110,8 @@ export function RevealView() {
         <Panel title="about">
           <p className="text-[10px] leading-relaxed tracking-wider text-muted">
             paste the text you received and enter the shared passphrase. the
-            decoder recomputes every word's keyed clues and reassembles the
-            payload; missing or reordered words are tolerated.
+            Paste the text you received and enter the shared passphrase.
+            Missing or reordered words are tolerated.
           </p>
         </Panel>
       }
