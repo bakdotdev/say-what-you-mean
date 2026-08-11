@@ -147,7 +147,7 @@ export function Panel({
     <section className="border border-edge bg-panel">
       {/* min-h matches a header carrying a Tag, so every panel header is the
           same height whether or not it has a badge. */}
-      <header className="flex min-h-[2.05rem] items-center justify-between gap-3 border-b border-edge px-3 py-1.5">
+      <header className="flex min-h-[2.125rem] items-center justify-between gap-3 border-b border-edge px-3 py-1.5">
         <h2 className="text-[10px] uppercase tracking-[0.18em] text-fg-dim">
           {title}
         </h2>

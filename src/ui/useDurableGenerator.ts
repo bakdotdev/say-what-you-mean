@@ -37,8 +37,13 @@ export interface DurableGenState {
 const ALLOWED_SAMPLE = 3000
 const COMMON_BAND = 9000
 /** Words per run. Short runs hold the vocabulary far better than long ones. */
-const RUN_WORDS = 300
-const MAX_RUNS = 8
+const RUN_WORDS = 350
+/**
+ * Harvesting now keeps only sentences whose carriers fit, so each run yields
+ * less text but far more usable text. More runs are needed to reach the
+ * carrier count the payload requires — 8 stopped ~40 carriers short.
+ */
+const MAX_RUNS = 16
 /**
  * Keep a sentence if at most this many of its CARRIER words need changing.
  * Judging by overall stray ratio was the bug: junk words dominate a sentence,
