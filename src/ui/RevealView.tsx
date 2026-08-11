@@ -49,7 +49,7 @@ export function RevealView() {
 
   const keyPanel = (
       <Panel title="passphrase">
-        <Field label="shared passphrase">
+        <Field label="the one you both know">
           <TextInput
             type="password"
             value={passphrase}
