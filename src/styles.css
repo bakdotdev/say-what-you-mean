@@ -1,17 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0a0a0b;
-  --color-panel: #141417;
-  --color-panel-2: #1c1c21;
-  --color-edge: #2a2a31;
-  --color-fg: #e7e7ea;
-  --color-muted: #9a9aa4;
-  --color-green: #3fb950;
-  --color-red: #f0603f;
-  --color-accent: #7c7cf0;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+  /* Terminal-ish surface stack */
+  --color-ink: #0b0a08;
+  --color-panel: #131110;
+  --color-panel-2: #1b1815;
+  --color-edge: #2e2820;
+
+  /* Amber phosphor palette */
+  --color-fg: #ffb62e;
+  --color-fg-dim: #c98a1f;
+  --color-muted: #8a6a2c;
+  --color-accent: #ffb62e;
+  --color-green: #7ddc5a;
+  --color-red: #ff5f4d;
+
+  --font-sans: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo,
+    monospace;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo,
+    monospace;
 }
 
 html,
@@ -24,6 +31,44 @@ body {
   margin: 0;
   background: var(--color-ink);
   color: var(--color-fg);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  /* faint scanline texture, purely decorative */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 182, 46, 0.022) 0px,
+    rgba(255, 182, 46, 0.022) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+::selection {
+  background: rgba(255, 182, 46, 0.25);
+}
+
+/* Amber range input */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--color-edge);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 0;
 }

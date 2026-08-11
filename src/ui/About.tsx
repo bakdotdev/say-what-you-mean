@@ -1,39 +1,37 @@
 /** Honest "how it works / limits" panel. No overselling (spec §6). */
 export function About() {
   return (
-    <details className="rounded-lg border border-edge bg-panel p-4 text-sm text-muted">
-      <summary className="cursor-pointer font-medium text-fg">
-        How it works &amp; what it doesn’t
+    <details className="border border-edge bg-panel text-[11px] leading-relaxed tracking-wider text-muted">
+      <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-fg-dim">
+        readme
       </summary>
-      <div className="mt-3 space-y-2 leading-relaxed">
+      <div className="space-y-2 border-t border-edge px-3 py-3">
         <p>
-          Your carrier text isn’t modified to carry the secret — instead, each
-          word’s keyed fingerprint already encodes one clue about the message.
-          You write text where every word’s clue happens to fit (that’s what
-          “green” means), guided by the live meter. The reader recomputes the
-          same fingerprints with the shared passphrase and reassembles the
-          message.
+          // your carrier text is never modified to carry the secret. each
+          word&apos;s keyed fingerprint already encodes one clue about the
+          message; you write text whose words happen to fit, guided by the live
+          map. the reader recomputes the same fingerprints with the shared
+          passphrase and reassembles the payload.
         </p>
         <p>
-          Because each clue depends only on its own word, deleting or reordering
+          // each clue depends only on its own word, so deleting or reordering
           words just drops clues — the rest still reconstruct the message, like
           a QR code with a torn corner.
         </p>
-        <p className="text-fg/80">Limits, stated plainly:</p>
-        <ul className="list-inside list-disc space-y-1">
+        <p className="text-fg-dim">// limits</p>
+        <ul className="space-y-1">
           <li>
-            This is a lab experiment, not a secure channel. Authentication is a
-            16-bit tag — good enough to reject a wrong passphrase, not to resist
-            a determined attacker.
+            — lab experiment, not a secure channel. authentication is a 16-bit
+            tag: enough to reject a wrong passphrase, not to resist a determined
+            attacker.
           </li>
           <li>
-            The passphrase is the only secret. Anyone with it and this app can
-            read the message. There is no per-message salt.
+            — the passphrase is the only secret; there is no per-message salt.
           </li>
           <li>
-            It hides a message inside ordinary text; it does not hide that the
-            text might contain one. Everything runs in your browser — nothing is
-            sent anywhere.
+            — hides a message inside ordinary text; does not hide that the text
+            might contain one. everything runs locally — nothing is sent
+            anywhere.
           </li>
         </ul>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { decode, type DecodeResult } from "../codec"
-import { Field, TextArea, TextInput, Tag } from "./primitives"
+import { Field, Panel, Tag, TextArea, TextInput } from "./primitives"
+import { DecryptReveal } from "../components/canvasui/DecryptReveal"
 
 export function RevealView() {
   const [carrier, setCarrier] = useState("")
@@ -31,61 +32,89 @@ export function RevealView() {
   const found = result?.secret != null
 
   return (
-    <div className="space-y-6">
-      <Field label="Paste the carrier text">
+    <div className="space-y-3">
+      <Panel title="received carrier">
         <TextArea
           value={carrier}
           onChange={(e) => setCarrier(e.target.value)}
-          rows={5}
+          rows={6}
           placeholder="Paste the text you received."
           aria-label="Received carrier text"
         />
-      </Field>
-      <Field label="Shared passphrase">
-        <TextInput
-          type="password"
-          value={passphrase}
-          onChange={(e) => setPassphrase(e.target.value)}
-          placeholder="the passphrase you agreed on"
-          aria-label="Shared passphrase"
-        />
-      </Field>
+      </Panel>
+
+      <Panel title="key">
+        <Field label="shared passphrase">
+          <TextInput
+            type="password"
+            value={passphrase}
+            onChange={(e) => setPassphrase(e.target.value)}
+            placeholder="the passphrase you agreed on"
+            aria-label="Shared passphrase"
+          />
+        </Field>
+      </Panel>
+
+      {busy && !result && (
+        <p className="text-[10px] tracking-[0.2em] text-muted">// decoding…</p>
+      )}
 
       {result && (
-        <div
-          className={
-            "rounded-lg border p-4 " +
-            (found
-              ? "border-green/40 bg-green/10"
-              : "border-red/40 bg-red/10")
+        <Panel
+          title="output"
+          right={
+            found ? <Tag tone="green">recovered</Tag> : <Tag tone="red">no match</Tag>
           }
         >
           {found ? (
-            <>
-              <p className="mb-1 text-xs uppercase tracking-wide text-green">
-                Hidden message
+            <DecryptReveal
+              key={result.secret}
+              color="#ffb62e"
+              radius={260}
+              cell={11}
+              passthrough={0.12}
+              edgeFlicker={1}
+              className="block"
+            >
+              <p className="break-all border border-green/40 bg-green/10 px-3 py-3 text-base tracking-widest text-green">
+                {result.secret}
               </p>
-              <p className="font-mono text-lg text-fg">{result.secret}</p>
-            </>
+            </DecryptReveal>
           ) : (
-            <p className="text-sm text-red">
-              No message found — wrong passphrase, or the text was damaged
-              beyond recovery.
+            <p className="border border-red/40 bg-red/10 px-3 py-2 text-xs leading-relaxed text-red">
+              wrong passphrase, or the text was damaged beyond recovery.
             </p>
           )}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <Tag>{result.diagnostics.words} words</Tag>
-            <Tag>{result.diagnostics.distinctWords} distinct</Tag>
-            {found && (
-              <Tag tone="green">
-                {result.diagnostics.bitsRecovered}/
-                {result.diagnostics.bitsTotal} bits
-              </Tag>
-            )}
-          </div>
-        </div>
+          <dl className="mt-2 grid grid-cols-2 gap-2 text-[10px] tracking-wider sm:grid-cols-4">
+            <Stat label="words" value={String(result.diagnostics.words)} />
+            <Stat
+              label="distinct"
+              value={String(result.diagnostics.distinctWords)}
+            />
+            <Stat
+              label="density"
+              value={found ? String(result.diagnostics.density) : "—"}
+            />
+            <Stat
+              label="bits"
+              value={
+                result.diagnostics.bitsTotal
+                  ? `${result.diagnostics.bitsRecovered}/${result.diagnostics.bitsTotal}`
+                  : "—"
+              }
+            />
+          </dl>
+        </Panel>
       )}
-      {busy && !result && <p className="text-sm text-muted">Decoding…</p>}
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-muted">{label}</dt>
+      <dd className="text-fg">{value}</dd>
     </div>
   )
 }

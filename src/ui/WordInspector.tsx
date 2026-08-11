@@ -36,10 +36,10 @@ export function WordInspector({
     FEATURE_METHODS.find((m) => m.id === methodId)
 
   return (
-    <div className="rounded-lg border border-edge bg-panel-2 p-4 text-sm">
+    <div className="border border-edge bg-panel-2 p-3 text-xs">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-semibold">“{report.word}”</span>
+          <span className="tracking-widest text-fg">{report.word}</span>
           <Tag tone={report.green ? "green" : "red"}>
             {report.satisfied}/{report.total} fit
           </Tag>
@@ -54,17 +54,16 @@ export function WordInspector({
       </div>
 
       {equations ? (
-        <div className="space-y-2 text-muted">
+        <div className="space-y-2 tracking-wider text-muted">
           <p>
-            This word speaks about the message through{" "}
-            {equations.length} independent{" "}
-            {equations.length === 1 ? "reading" : "readings"}:
+            // {equations.length} independent{" "}
+            {equations.length === 1 ? "reading" : "readings"} of this word:
           </p>
           <ul className="space-y-1">
             {equations.map((eq, i) => {
               const method = labelFor(eq.methodId)
               return (
-                <li key={i} className="font-mono text-xs">
+                <li key={i} className="text-[10px]">
                   <span className="text-fg">{method?.label ?? eq.methodId}</span>{" "}
                   <span className="text-muted">({method?.describe})</span> → bits{" "}
                   <span className="text-fg">{eq.subset.join(", ")}</span> ⊕ ={" "}
@@ -75,12 +74,12 @@ export function WordInspector({
           </ul>
           <p>
             {report.green
-              ? "All of these agree with the hidden message, so the word is usable."
-              : "At least one disagrees with the hidden message — pick a different word."}
+              ? "// all agree with the payload — word is usable"
+              : "// at least one disagrees — pick a different word"}
           </p>
         </div>
       ) : (
-        <p className="text-muted">Computing…</p>
+        <p className="tracking-wider text-muted">// computing…</p>
       )}
     </div>
   )

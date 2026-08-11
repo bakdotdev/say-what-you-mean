@@ -1,4 +1,4 @@
-/** Small local UI primitives styled for the dark lab theme. */
+/** Terminal-style primitives: monospace, amber, square edges. */
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -20,10 +20,10 @@ export function Button({
     <button
       {...props}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex items-center justify-center gap-2 border px-3 py-1.5 text-xs uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-30",
         variant === "solid"
-          ? "bg-accent text-white hover:bg-accent/85"
-          : "border border-edge bg-panel-2 text-fg hover:border-muted",
+          ? "border-accent bg-accent/10 text-accent hover:bg-accent/20"
+          : "border-edge bg-transparent text-muted hover:border-fg-dim hover:text-fg",
         className,
       )}
     />
@@ -41,64 +41,67 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <div className="mb-1.5 flex items-baseline justify-between">
-        <span className="text-sm font-medium text-fg">{label}</span>
-        {hint && <span className="text-xs text-muted">{hint}</span>}
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted">
+          {label}
+        </span>
+        {hint && (
+          <span className="text-[10px] tracking-wider text-muted">{hint}</span>
+        )}
       </div>
       {children}
     </label>
   )
 }
 
+const inputBase =
+  "w-full border border-edge bg-panel px-2.5 py-1.5 text-fg caret-accent outline-none placeholder:text-muted/60 focus:border-accent"
+
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={cx(
-        "w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-fg outline-none placeholder:text-muted focus:border-accent",
-        props.className,
-      )}
-    />
-  )
+  return <input {...props} className={cx(inputBase, props.className)} />
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
       {...props}
-      className={cx(
-        "w-full resize-y rounded-lg border border-edge bg-panel px-3 py-2 font-mono text-sm leading-relaxed text-fg outline-none placeholder:text-muted focus:border-accent",
-        props.className,
-      )}
+      className={cx(inputBase, "resize-y leading-relaxed", props.className)}
     />
   )
 }
 
+/** Blocky segmented meter, like a load bar. */
 export function Meter({
   value,
   max,
   tone = "accent",
+  segments = 40,
 }: {
   value: number
   max: number
   tone?: "accent" | "green"
+  segments?: number
 }) {
-  const pct = max <= 0 ? 0 : Math.min(100, Math.round((value / max) * 100))
+  const pct = max <= 0 ? 0 : Math.min(1, value / max)
+  const filled = Math.round(pct * segments)
+  const color = tone === "green" ? "bg-green" : "bg-accent"
   return (
     <div
-      className="h-2 w-full overflow-hidden rounded-full bg-panel-2"
+      className="flex gap-[2px]"
       role="progressbar"
-      aria-valuenow={pct}
+      aria-valuenow={Math.round(pct * 100)}
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <div
-        className={cx(
-          "h-full rounded-full transition-[width] duration-200",
-          tone === "green" ? "bg-green" : "bg-accent",
-        )}
-        style={{ width: `${pct}%` }}
-      />
+      {Array.from({ length: segments }, (_, i) => (
+        <span
+          key={i}
+          className={cx(
+            "h-2.5 flex-1 transition-colors",
+            i < filled ? color : "bg-edge/60",
+          )}
+        />
+      ))}
     </div>
   )
 }
@@ -113,13 +116,36 @@ export function Tag({
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
-        tone === "green" && "bg-green/15 text-green",
-        tone === "red" && "bg-red/15 text-red",
-        tone === "muted" && "bg-panel-2 text-muted",
+        "inline-flex items-center border px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
+        tone === "green" && "border-green/40 bg-green/10 text-green",
+        tone === "red" && "border-red/40 bg-red/10 text-red",
+        tone === "muted" && "border-edge bg-panel-2 text-muted",
       )}
     >
       {children}
     </span>
+  )
+}
+
+/** Section frame with a bracketed title, like a TUI panel. */
+export function Panel({
+  title,
+  right,
+  children,
+}: {
+  title: string
+  right?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="border border-edge bg-panel">
+      <header className="flex items-center justify-between border-b border-edge px-3 py-1.5">
+        <h2 className="text-[10px] uppercase tracking-[0.18em] text-fg-dim">
+          {title}
+        </h2>
+        {right}
+      </header>
+      <div className="p-3">{children}</div>
+    </section>
   )
 }

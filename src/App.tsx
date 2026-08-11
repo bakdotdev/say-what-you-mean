@@ -5,40 +5,50 @@ import { About } from "./ui/About"
 
 type Tab = "hide" | "reveal"
 
+const TABS: { id: Tab; label: string; glyph: string }[] = [
+  { id: "hide", label: "hide", glyph: "▚" },
+  { id: "reveal", label: "reveal", glyph: "▞" },
+]
+
 export function App() {
   const [tab, setTab] = useState<Tab>("hide")
 
   return (
-    <main className="mx-auto max-w-2xl px-5 py-12 sm:py-16">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Say What You Mean
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Hide a short message inside ordinary text you write yourself — no
-          hidden characters, just your words read through a shared key.
+    <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+      <header className="mb-4 border-b border-edge pb-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <h1 className="text-sm uppercase tracking-[0.25em] text-fg">
+            say-what-you-mean
+          </h1>
+          <span className="text-[10px] tracking-wider text-muted">v1</span>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed tracking-wider text-muted">
+          // coverless steganography — your exact words, read through a shared
+          key. no hidden characters.
         </p>
       </header>
 
       <div
         role="tablist"
         aria-label="Mode"
-        className="mb-6 inline-flex rounded-lg border border-edge bg-panel p-1"
+        className="mb-3 flex border border-edge"
       >
-        {(["hide", "reveal"] as const).map((t) => (
+        {TABS.map((t, i) => (
           <button
-            key={t}
+            key={t.id}
             role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
             className={
-              "rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors " +
-              (tab === t
-                ? "bg-accent text-white"
-                : "text-muted hover:text-fg")
+              "flex flex-1 items-center justify-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors " +
+              (i > 0 ? "border-l border-edge " : "") +
+              (tab === t.id
+                ? "bg-accent/10 text-accent"
+                : "bg-panel text-muted hover:text-fg-dim")
             }
           >
-            {t}
+            <span aria-hidden="true">{t.glyph}</span>
+            {t.label}
           </button>
         ))}
       </div>
@@ -47,7 +57,7 @@ export function App() {
         {tab === "hide" ? <HideView /> : <RevealView />}
       </section>
 
-      <footer className="mt-10">
+      <footer className="mt-4">
         <About />
       </footer>
     </main>
