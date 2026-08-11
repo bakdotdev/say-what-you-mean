@@ -21,7 +21,7 @@ const ENCODINGS: Encoding[] = ["compact", "durable"]
 
 const readParams = (): { version: Version; mode: Mode; encoding: Encoding } => {
   if (typeof window === "undefined")
-    return { version: "v1", mode: "hide", encoding: "compact" }
+    return { version: "v1", mode: "hide", encoding: "durable" }
   const params = new URLSearchParams(window.location.search)
   const v = params.get("v")
   const m = params.get("mode")
@@ -29,7 +29,7 @@ const readParams = (): { version: Version; mode: Mode; encoding: Encoding } => {
   return {
     version: VERSIONS.includes(v as Version) ? (v as Version) : "v1",
     mode: MODES.includes(m as Mode) ? (m as Mode) : "hide",
-    encoding: ENCODINGS.includes(e as Encoding) ? (e as Encoding) : "compact",
+    encoding: ENCODINGS.includes(e as Encoding) ? (e as Encoding) : "durable",
   }
 }
 

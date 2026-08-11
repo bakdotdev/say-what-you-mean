@@ -145,8 +145,8 @@ export function HideView({
       <div className="mb-2 flex border border-edge">
         {(
           [
-            { id: false, label: "compact" },
             { id: true, label: "durable" },
+            { id: false, label: "compact" },
           ] as const
         ).map((opt, i) => (
           <button

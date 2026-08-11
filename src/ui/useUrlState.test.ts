@@ -47,21 +47,21 @@ describe("useUrlState", () => {
 })
 
 describe("useUrlState — encoding", () => {
-  it("defaults to compact and round-trips durable", () => {
+  it("defaults to durable and round-trips compact", () => {
     window.history.replaceState(null, "", "/say-what-you-mean/")
     const { result } = renderHook(() => useUrlState())
-    expect(result.current.encoding).toBe("compact")
-    act(() => result.current.setEncoding("durable"))
-    expect(window.location.search).toContain("enc=durable")
+    expect(result.current.encoding).toBe("durable")
+    act(() => result.current.setEncoding("compact"))
+    expect(window.location.search).toContain("enc=compact")
     // other params survive
     expect(window.location.search).toContain("v=v1")
     expect(window.location.search).toContain("mode=hide")
   })
 
   it("reads enc from the url and ignores invalid values", () => {
-    window.history.replaceState(null, "", "/say-what-you-mean/?enc=durable")
-    expect(renderHook(() => useUrlState()).result.current.encoding).toBe("durable")
-    window.history.replaceState(null, "", "/say-what-you-mean/?enc=nonsense")
+    window.history.replaceState(null, "", "/say-what-you-mean/?enc=compact")
     expect(renderHook(() => useUrlState()).result.current.encoding).toBe("compact")
+    window.history.replaceState(null, "", "/say-what-you-mean/?enc=nonsense")
+    expect(renderHook(() => useUrlState()).result.current.encoding).toBe("durable")
   })
 })
