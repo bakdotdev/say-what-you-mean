@@ -16,6 +16,8 @@
  * Protections: same-origin only, small body caps, and a per-IP token bucket.
  */
 
+import { originAllowed, clientIp } from "./_origin.js"
+
 export const config = { runtime: "edge" }
 
 const MODEL = "anthropic/claude-haiku-4.5"
@@ -66,23 +68,9 @@ const json = (value, status = 200) =>
 export default async function handler(req) {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405)
 
-  // Same-origin only: this endpoint exists for the app, not for the world.
-  const origin = req.headers.get("origin")
-  if (origin) {
-    try {
-      const host = new URL(origin).host
-      if (host !== new URL(req.url).host) {
-        return json({ error: "forbidden" }, 403)
-      }
-    } catch {
-      return json({ error: "forbidden" }, 403)
-    }
-  }
+  if (!originAllowed(req)) return json({ error: "forbidden" }, 403)
 
-  const ip =
-    req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown"
+  const ip = clientIp(req)
   if (!allowed(ip)) return json({ error: "rate limited — try again shortly" }, 429)
 
   const key = process.env.AI_GATEWAY_API_KEY
