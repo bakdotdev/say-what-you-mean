@@ -21,7 +21,14 @@ import { originAllowed, clientIp } from "./_origin.js"
  */
 export const config = { runtime: "nodejs", maxDuration: 60 }
 
-const MODEL = "anthropic/claude-haiku-4.5"
+/**
+ * Sonnet, not Haiku. Composing inside a multi-thousand-word vocabulary is an
+ * instruction-following problem, and Haiku measured at ~47% adherence — which
+ * is chance, since the allowed list is ~50% of the vocabulary by construction.
+ * It was ignoring the constraint entirely. Sonnet was previously impossible
+ * only because edge capped at ~25s; this route is Node with a 60s budget.
+ */
+const MODEL = "anthropic/claude-sonnet-5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
 const MIN_WORDS = 60
