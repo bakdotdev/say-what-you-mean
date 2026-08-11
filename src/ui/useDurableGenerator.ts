@@ -32,7 +32,6 @@ import {
   type Encoder,
 } from "../codec"
 import { isCarrierWord } from "../codec/equations"
-import { isFunctionWord } from "../codec/features"
 import { COMMON_WORD_COUNT } from "./useWordlist"
 
 export interface DurableGenState {
@@ -46,13 +45,6 @@ export interface DurableGenState {
  * clears the ~55 needed with margin; the generate function has a 60s budget.
  */
 const RUN_WORDS = 700
-/**
- * How many allowed words to send. 477 works; ~1500 made the model return an
- * empty completion, so this stays well inside what it will actually use.
- */
-const ALLOWED_SAMPLE = 600
-/** Free half of the palette: function words plus common non-carriers. */
-const FREE_SAMPLE = 700
 /** Extra passes when the first piece lands short of a decode. */
 const MAX_RUNS = 4
 /**
@@ -126,15 +118,6 @@ export function useDurableGenerator() {
         }
         const fitting: string[] = []
         for (const word of pool) if (await isCarrier(word)) fitting.push(word)
-        // The other half of the palette: words that carry nothing, so the
-        // model can join the key words up without breaking anything. Naming
-        // them beat calling the rest of English "unrestricted".
-        const free: string[] = []
-        for (const word of vocabulary.slice(0, COMMON_BAND)) {
-          if (free.length >= FREE_SAMPLE) break
-          if (isFunctionWord(word)) free.push(word)
-          else if (word.length >= 3 && !(await isCarrier(word))) free.push(word)
-        }
         if (fitting.length === 0) {
           setState({ busy: false, stage: "", error: "no usable words found" })
           return null
@@ -154,10 +137,13 @@ export function useDurableGenerator() {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               words: RUN_WORDS,
-              // The palette. Keep it near ALLOWED_SAMPLE — a list of ~1500
-              // made the model return an empty completion.
-              allowed: fitting.slice(0, ALLOWED_SAMPLE),
-              free,
+              // No word palette. Measured on Sonnet 4.5: constraining
+              // composition cuts substitutions from 13% to 4% at ~120 words,
+              // but by ~650 words — the length a payload needs — adherence
+              // has decayed and the advantage is gone (12% vs 13%). On the
+              // Sonnet 5 that generation actually runs on, the constrained
+              // prompt returns an empty completion outright. So: free prose,
+              // and spend the effort on the replacement words instead.
               topic:
                 run === 1
                   ? topic

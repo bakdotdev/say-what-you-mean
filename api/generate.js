@@ -19,7 +19,7 @@ import { originAllowed, clientIp } from "./_origin.js"
  * empty completion, 3000 timed out). Node lets the prompt be big enough to
  * work.
  */
-export const config = { runtime: "nodejs", maxDuration: 60 }
+export const config = { runtime: "nodejs", maxDuration: 300 }
 
 /**
  * Sonnet, not Haiku. Composing inside a multi-thousand-word vocabulary is an
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.9,
         messages: [
           {
