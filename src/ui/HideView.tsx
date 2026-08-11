@@ -430,12 +430,14 @@ export function HideView({
 
       </div>
 
-      <Meter
-        value={embedded ? 1 : status.words}
-        max={embedded ? 1 : Math.max(status.words, status.bits + 1)}
-        tone={embedded ? "green" : "accent"}
-        segments={28}
-      />
+      <div className="mt-3">
+        <Meter
+          value={embedded ? 1 : status.words}
+          max={embedded ? 1 : Math.max(status.words, status.bits + 1)}
+          tone={embedded ? "green" : "accent"}
+          segments={28}
+        />
+      </div>
       <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
         {!ready
           ? "Enter a secret and passphrase to begin."
