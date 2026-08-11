@@ -12,14 +12,14 @@ import { deriveKeys } from "../codec"
 import { isCarrierWord, wordDigests } from "../codec/equations"
 import { FUNCTION_WORDS } from "../codec/features"
 
-const WANTED = 16
-const MAX_PROBES = 900
+const WANTED = 60
+const MAX_PROBES = 2500
 /**
  * Function words are free by definition — they are never used to decrypt,
  * whatever their hash says — so they lead the list. They are also the words
  * you most often need while writing, and the ones you cannot substitute.
  */
-const FUNCTION_WORD_SLOTS = 8
+const FUNCTION_WORD_SLOTS = 40
 
 export function useFreeWords(
   passphrase: string,

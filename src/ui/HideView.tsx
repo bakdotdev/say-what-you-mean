@@ -339,54 +339,6 @@ export function HideView({
         </span>
         <span>CLICK A WORD FOR OPTIONS</span>
       </div>
-      {/* Swatches use MARK_STYLES, the same source as the text, so the
-          legend cannot drift out of sync with what is rendered. */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-wider text-muted">
-        <span className="flex items-center gap-2">
-          <span className={`font-mono text-fg ${MARK_STYLES.carrier}`}>
-            WORD
-          </span>
-          NEEDS CHANGING
-        </span>
-        <span className="flex items-center gap-2">
-          <span className={`font-mono text-fg ${MARK_STYLES.required}`}>
-            WORD
-          </span>
-          REQUIRED TO DECRYPT
-        </span>
-        <span className="flex items-center gap-2">
-          <span className={`font-mono text-fg ${MARK_STYLES.locked}`}>
-            WORD
-          </span>
-          LOCKED
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="font-mono text-muted">WORD</span>
-          NOT USED
-        </span>
-        <span>CLICK A WORD FOR OPTIONS</span>
-      </div>
-      {freeWrite && durable && freeWords.length > 0 && (
-        <div className="mt-3 border-t border-edge pt-3">
-          <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted">
-            free words — carry nothing, click to add
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {freeWords.map((w) => (
-              <button
-                key={w}
-                onClick={() => {
-                  setCarrier((c) => (c.trim() ? `${c.trimEnd()} ${w}` : w))
-                  setCopied(false)
-                }}
-                className="border border-edge bg-panel-2 px-1.5 py-0.5 text-xs normal-case text-fg-dim hover:border-accent hover:text-fg"
-              >
-                {w}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </Panel>
   )
 
@@ -400,7 +352,7 @@ export function HideView({
           </span>
         }
       >
-        <div className="flex flex-wrap gap-1">
+        <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
           {freeWords.map((w) => (
             <button
               key={w}
@@ -415,7 +367,8 @@ export function HideView({
           ))}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-muted">
-          Add any of these anywhere — they never affect the message.
+          {freeWords.length} words you can add anywhere — none affect the
+          message.
         </p>
       </Panel>
     ) : null
