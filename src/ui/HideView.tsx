@@ -61,6 +61,12 @@ export function HideView({
   // Box locked words solidly and to-be-swapped words dimly, in place.
   // Every word is a target so any of them can be locked; only the meaningful
   // ones carry a fill.
+  // Nothing is "required" until the payload can actually be embedded — a
+  // carrier too short to carry anything has no load-bearing words.
+  const hasPlan = durable
+    ? durablePlan.state !== null && !durablePlan.busy
+    : status.plan !== null
+
   const marks: Mark[] = useMemo(
     () =>
       spans.map<Mark>((span, i) => ({
@@ -71,14 +77,18 @@ export function HideView({
           ? "locked"
           : flipSet.has(i)
             ? "carrier"
-            : "required",
+            : hasPlan
+              ? "required"
+              : "plain",
         title: lockedSet.has(i)
           ? "locked — click to unlock"
           : flipSet.has(i)
             ? "being changed — click to lock it"
-            : "carrying a clue — click to lock",
+            : hasPlan
+              ? "carrying a clue — click to lock"
+              : "click to lock",
       })),
-    [spans, flipSet, lockedSet],
+    [spans, flipSet, lockedSet, hasPlan],
   )
 
   const toggleLock = useCallback((slot: number) => {
