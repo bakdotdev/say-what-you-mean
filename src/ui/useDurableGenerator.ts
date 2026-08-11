@@ -82,6 +82,8 @@ export function useDurableGenerator() {
       try {
         const base = import.meta.env.BASE_URL
         const encoder = await createEncoder(secret, passphrase, 1, true)
+        // Payload size drives how many carrier words we need before repairing.
+        const payloadBits = encoder.B
 
         // Whether a word fits depends only on the word and the key, so the
         // usable vocabulary is knowable before any text exists.
@@ -165,12 +167,18 @@ export function useDurableGenerator() {
           // Cleanest first, so the least-repaired text leads.
           kept.sort((a, b) => a.strays - b.strays)
 
-          // Repair BEFORE testing. Harvested sentences still contain stray
-          // carriers, so raw accumulated text never reports solved — which is
-          // why earlier runs piled up 700+ words and still failed. Repairing
-          // each round means the loop actually converges, and it stops at the
-          // first length that works instead of running to the cap.
+          // Harvested sentences still contain stray carriers, so raw text
+          // never reports solved on its own — earlier runs piled up 700+ words
+          // and still failed. But repairing every round is far too slow (many
+          // vocabulary scans plus an API call each time), so only attempt it
+          // once there is plausibly enough material: enough carrier words to
+          // cover the payload with headroom.
           const raw = kept.map((k) => k.sentence).join(" ")
+          const rawState = await encoder.evaluate(raw)
+          const carrierCount = rawState.words.filter((w) => !w.junk).length
+          if (carrierCount < payloadBits * 1.15) continue
+
+          setState({ busy: true, stage: "fitting words…", error: null })
           const candidate = await repair(
             encoder,
             raw,
