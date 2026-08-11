@@ -43,6 +43,8 @@ export interface DecryptRevealOptions {
   edgeGlow?: number;
   /** How strongly the wavefront tints toward the cipher color (0 to 1). */
   edgeTint?: number;
+  /** Chromatic aberration of the revealed UI at the decrypt edge in CSS pixels. */
+  aberration?: number;
   /** How much of the real UI shows through the cipher (0 to 1). 0 keeps the page fully encrypted. */
   passthrough?: number;
   /** Contrast against the background above which a cell counts as UI and earns a glyph. */
@@ -93,6 +95,7 @@ const DEFAULTS: Required<DecryptRevealOptions> = {
   edgeFlicker: 1,
   edgeGlow: 2,
   edgeTint: 0.75,
+  aberration: 10,
   passthrough: 0.15,
   threshold: 0.025,
   background: "#000000",
@@ -120,15 +123,6 @@ type PaintableCanvas = HTMLCanvasElement & {
 type ElementImageContext = CanvasRenderingContext2D & {
   drawElementImage?: (element: Element, x: number, y: number) => void;
 };
-
-/**
- * Chrome's shipping HTML-in-Canvas origin trial (148-150) exposes
- * `element.layoutSubtree()` + `ctx.drawElementImage()`. An earlier iteration
- * of the proposal also had `canvas.onpaint` / `canvas.requestPaint()`, which
- * this component was written against. We support BOTH: if requestPaint is
- * absent we drive the paint ourselves each frame.
- */
-type LayoutableElement = Element & { layoutSubtree?: () => void };
 
 const VERT = `#version 300 es
 precision highp float;
@@ -305,6 +299,7 @@ uniform float uEdgeWidth;
 uniform float uEdgeFlicker;
 uniform float uEdgeGlow;
 uniform float uEdgeTint;
+uniform float uAberration;
 uniform float uPassthrough;
 uniform vec3 uBg;
 uniform float uTime;
@@ -343,8 +338,10 @@ void main () {
   float bandD = dist - mix(inner, radius, 0.5);
   float ring = exp(-bandD * bandD / (2.0 * bandW * bandW)) * uActive;
 
+  vec2 dir = (pc - uPointer) / max(dist, 1e-3);
+  float ca = uAberration * ring;
   vec4 rC = samp(pc);
-  vec3 real = rC.rgb;
+  vec3 real = vec3(samp(pc + dir * ca).r, rC.g, samp(pc - dir * ca).b);
 
   vec2 cellPos = pc * uDpr / uCellPx;
   vec2 cell = clamp(floor(cellPos), vec2(0.0), uGrid - 1.0);
@@ -501,7 +498,11 @@ export function supportsHtmlInCanvas(): boolean {
   if (typeof document === "undefined") return false;
   const probe = document.createElement("canvas") as PaintableCanvas;
   const ctx = probe.getContext("2d") as ElementImageContext | null;
-  return Boolean(ctx && typeof ctx.drawElementImage === "function");
+  return Boolean(
+    ctx &&
+    typeof ctx.drawElementImage === "function" &&
+    typeof probe.requestPaint === "function",
+  );
 }
 
 export function createDecryptReveal(
@@ -524,28 +525,13 @@ export function createDecryptReveal(
   const paintable = source as PaintableCanvas;
   const htmlInCanvas = Boolean(
     sourceCtx &&
-    typeof sourceCtx.drawElementImage === "function",
+    typeof sourceCtx.drawElementImage === "function" &&
+    typeof paintable.requestPaint === "function",
   );
 
   let contentDirty = false;
   let cellsDirty = true;
   let wake = () => {};
-
-  /**
-   * Shipping-API paint path: lay out the live DOM subtree and draw it into the
-   * source canvas ourselves. Used when `canvas.requestPaint` is unavailable
-   * (Chrome 148-150 origin trial), where the older onpaint callback never fires.
-   */
-  const usesRequestPaint = typeof paintable.requestPaint === "function";
-  function pumpContent() {
-    if (!htmlInCanvas) return;
-    try {
-      (content as LayoutableElement).layoutSubtree?.();
-      sourceCtx!.reset();
-      sourceCtx!.drawElementImage!(content, 0, 0);
-      contentDirty = true;
-    } catch {}
-  }
 
   if (htmlInCanvas) {
     paintable.onpaint = () => {
@@ -744,11 +730,7 @@ export function createDecryptReveal(
         source.width = cssWidth * dpr;
         source.height = cssHeight * dpr;
       }
-      if (typeof paintable.requestPaint === "function") {
-        paintable.requestPaint();
-      } else {
-        pumpContent();
-      }
+      paintable.requestPaint!();
     }
     cellsDirty = true;
   }
@@ -901,6 +883,7 @@ export function createDecryptReveal(
     gl!.uniform1f(u.uEdgeFlicker, Math.min(Math.max(config.edgeFlicker, 0), 1));
     gl!.uniform1f(u.uEdgeGlow, Math.min(Math.max(config.edgeGlow, 0), 3));
     gl!.uniform1f(u.uEdgeTint, config.edgeTint);
+    gl!.uniform1f(u.uAberration, Math.max(config.aberration, 0));
     gl!.uniform1f(u.uPassthrough, config.passthrough);
     gl!.uniform3f(u.uBg, bg[0], bg[1], bg[2]);
     gl!.uniform1f(u.uTime, time);
@@ -931,7 +914,6 @@ export function createDecryptReveal(
     pointer.x += (pointer.tx - pointer.x) * k;
     pointer.y += (pointer.ty - pointer.y) * k;
     pointer.active += (pointer.target - pointer.active) * k;
-    if (htmlInCanvas && !usesRequestPaint) pumpContent();
     render();
     const settled =
       Math.abs(pointer.tx - pointer.x) < 0.1 &&

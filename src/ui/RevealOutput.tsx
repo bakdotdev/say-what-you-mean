@@ -47,6 +47,7 @@ export function RevealOutput({ secret }: { secret: string }) {
       cell={10}
       passthrough={0.12}
       edgeFlicker={1}
+      aberration={0}
       className="block"
     >
       <p className="border border-fg/50 bg-accent/10 px-3 py-3 text-xl tracking-[0.3em] text-fg">
