@@ -12,13 +12,15 @@
 
 import { originAllowed, clientIp } from "./_origin.js"
 
-export const config = { runtime: "edge" }
+/**
+ * Node runtime with a long budget, NOT edge. A large allowed-vocabulary prompt
+ * is what makes the model actually stay in-vocabulary, and edge's ~25s ceiling
+ * was truncating those requests (measured: 700 words fine, 1200+ returned an
+ * empty completion, 3000 timed out). Node lets the prompt be big enough to
+ * work.
+ */
+export const config = { runtime: "nodejs", maxDuration: 60 }
 
-// Haiku, deliberately. Sonnet follows a long vocabulary list better, but with
-// a few thousand words in the prompt it exceeds the edge function's ~25s
-// budget — measured: 700 words fine, 1200+ empty completion, 3000 timeout.
-// Adherence is bought by re-rolling drafts instead (see useDurableGenerator),
-// which is cheaper and does not risk a dead request.
 const MODEL = "anthropic/claude-haiku-4.5"
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions"
 
@@ -74,30 +76,31 @@ Rules:
 - Do not mention writing, messages, secrets, codes or this task.
 - Return ONLY the paragraph text.`
 
-const json = (value, status = 200) =>
-  new Response(JSON.stringify(value), {
-    status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
-  })
+const safeParse = (text) => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {}
+  }
+}
 
-export default async function handler(req) {
-  if (req.method !== "POST") return json({ error: "method not allowed" }, 405)
+export default async function handler(req, res) {
+  res.setHeader("cache-control", "no-store")
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "method not allowed" })
 
-  if (!originAllowed(req)) return json({ error: "forbidden" }, 403)
+  if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" })
 
   const ip = clientIp(req)
   if (!withinRateLimit(ip))
-    return json({ error: "rate limited — try again shortly" }, 429)
+    return res.status(429).json({ error: "rate limited — try again shortly" })
 
   const key = process.env.AI_GATEWAY_API_KEY
-  if (!key) return json({ error: "AI_GATEWAY_API_KEY not configured" }, 500)
+  if (!key)
+    return res.status(500).json({ error: "AI_GATEWAY_API_KEY not configured" })
 
-  let body
-  try {
-    body = await req.json()
-  } catch {
-    return json({ error: "invalid json" }, 400)
-  }
+  const body =
+    typeof req.body === "string" ? safeParse(req.body) : (req.body ?? {})
 
   const words = Math.min(
     MAX_WORDS,
@@ -107,13 +110,13 @@ export default async function handler(req) {
   // Optional allowed vocabulary — capped so the prompt stays sane.
   const allowedWords = Array.isArray(body?.allowed)
     ? body.allowed
-        .slice(0, 1000)
+        .slice(0, 4000)
         .map((w) => String(w).slice(0, 24))
         .filter(Boolean)
     : []
 
   try {
-    const res = await fetch(GATEWAY, {
+    const upstream = await fetch(GATEWAY, {
       method: "POST",
       headers: {
         authorization: `Bearer ${key}`,
@@ -138,26 +141,24 @@ export default async function handler(req) {
       }),
     })
 
-    if (!res.ok) {
-      const detail = await res.text()
-      return json(
-        { error: `gateway ${res.status}`, detail: detail.slice(0, 300) },
-        502,
-      )
+    if (!upstream.ok) {
+      const detail = await upstream.text()
+      return res
+        .status(502)
+        .json({ error: `gateway ${upstream.status}`, detail: detail.slice(0, 300) })
     }
 
-    const data = await res.json()
+    const data = await upstream.json()
     const text = (data.choices?.[0]?.message?.content ?? "")
       .replace(/^["'\s]+|["'\s]+$/g, "")
       .replace(/\s+/g, " ")
       .trim()
-    if (!text) return json({ error: "empty completion" }, 502)
+    if (!text) return res.status(502).json({ error: "empty completion" })
 
-    return json({ carrier: text })
+    return res.status(200).json({ carrier: text })
   } catch (err) {
-    return json(
-      { error: err instanceof Error ? err.message : "request failed" },
-      502,
-    )
+    return res
+      .status(502)
+      .json({ error: err instanceof Error ? err.message : "request failed" })
   }
 }

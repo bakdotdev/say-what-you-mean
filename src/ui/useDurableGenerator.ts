@@ -27,9 +27,14 @@ export interface DurableGenState {
   error: string | null
 }
 
-/** Words handed to the model. Kept small — long lists time the request out. */
-const ALLOWED_SAMPLE = 800
-const COMMON_BAND = 7000
+/**
+ * A large allowed list is what actually makes the model stay in-vocabulary.
+ * 800 was far too few — it strayed constantly and almost no sentence survived
+ * harvesting. Generation runs on a Node function with a 60s budget so the
+ * prompt can be this big.
+ */
+const ALLOWED_SAMPLE = 3000
+const COMMON_BAND = 9000
 /** Words per run. Short runs hold the vocabulary far better than long ones. */
 const RUN_WORDS = 300
 const MAX_RUNS = 8

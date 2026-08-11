@@ -13,8 +13,14 @@
 const ALLOWED_SUFFIXES = [".bak.dev", ".vercel.app"]
 const ALLOWED_EXACT = ["bak.dev", "localhost"]
 
+/** Works with both the Web Request (edge) and Node's IncomingMessage. */
+const header = (req, name) =>
+  typeof req.headers?.get === "function"
+    ? req.headers.get(name)
+    : (req.headers?.[name] ?? null)
+
 export const originAllowed = (req) => {
-  const origin = req.headers.get("origin")
+  const origin = header(req, "origin")
   // No Origin (same-origin form posts, curl, server-to-server) — nothing to check.
   if (!origin) return true
   let host
@@ -30,6 +36,6 @@ export const originAllowed = (req) => {
 
 /** Client IP for rate limiting, best-effort. */
 export const clientIp = (req) =>
-  req.headers.get("x-real-ip") ||
-  req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+  header(req, "x-real-ip") ||
+  header(req, "x-forwarded-for")?.split(",")[0]?.trim() ||
   "unknown"
