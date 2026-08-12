@@ -24,9 +24,16 @@ export function TokenHideView() {
   const model = useTokenModel()
 
   const copy = async () => {
-    await navigator.clipboard.writeText(carrier)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(carrier)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Browsers reject clipboard writes outside a trusted gesture, or when
+      // the permission is denied. Say so rather than looking like nothing
+      // happened, and leave the text on screen to select by hand.
+      setError("could not reach the clipboard — select the text and copy it")
+    }
   }
 
   const ready = Boolean(secret && passphrase) && !busy
