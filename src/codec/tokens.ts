@@ -61,6 +61,9 @@ export const MODEL_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
  */
 const CANDIDATE_COUNT = 32
 
+const BACKEND =
+  typeof window === "undefined" ? ("cpu" as const) : ("wasm" as const)
+
 /** Topics the prompt is drawn from, so a carrier reads as an ordinary note. */
 const TOPICS = [
   "the weather this week",
@@ -126,6 +129,13 @@ export const loadModel = (onProgress?: (p: LoadProgress) => void) => {
       })
       const model = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
         dtype: "q8",
+        // Pinned, not left to the runtime's choice. Execution providers do
+        // not agree bit for bit, so if one person's browser picked WebGPU and
+        // another's picked WASM they could not read each other's messages.
+        // Both ends of a real exchange are browsers, so wasm is the contract;
+        // "cpu" is the Node equivalent and exists only for the tests, which
+        // verify the mechanism rather than compatibility with a browser.
+        device: BACKEND,
         progress_callback: report,
       })
       return { model, tokenizer, Tensor: Tensor as unknown as TensorCtor }
@@ -292,6 +302,24 @@ const codeFor = (root: Node, id: number): Bit[] | null => {
  * carriers came back as "**** Sentence A**: It wouldnt leave much mess" —
  * because nothing told it where its own turn began.
  */
+/**
+ * How the message starts. Part of the prompt, so it is not carrying any bits,
+ * but it IS shown and sent, so the reader sees a whole message rather than a
+ * fragment beginning mid-sentence.
+ *
+ * Without it the model treats the request as a task to comment on and opens
+ * with preamble — "I will now: (Change text to "Clear text" format)". Starting
+ * its turn mid-greeting leaves it nowhere to go but into the message.
+ */
+// No trailing space: the prompt must end ON the comma so the first emitted
+// token carries its own leading space. End the prompt with a space instead
+// and that space belongs to the prompt, so re-encoding the received text adds
+// one the encoder never emitted and every token after it desynchronises.
+const OPENERS = ["Hey,", "Hi,", "Morning,", "Just so you know,", "Quick one,"]
+
+export const openerFor = (keys: Keys): string =>
+  OPENERS[keys.stream[1] % OPENERS.length]
+
 export const promptIdsFor = (
   tokenizer: PreTrainedTokenizer,
   keys: Keys,
@@ -313,7 +341,7 @@ export const promptIdsFor = (
     { add_generation_prompt: true, tokenize: false },
   ) as string
   return Array.from(
-    tokenizer.encode(text, { add_special_tokens: false }),
+    tokenizer.encode(text + openerFor(keys), { add_special_tokens: false }),
   ) as number[]
 }
 
@@ -341,7 +369,9 @@ export const embed = async (
     onProgress?.(Math.min(at, payload.length), payload.length)
   }
 
-  return tokenizer.decode(emitted, { skip_special_tokens: true }).trim()
+  // The opener is prompt, not payload, but it ships with the message so the
+  // reader sees a whole sentence. The emitted text keeps its leading space.
+  return openerFor(keys) + tokenizer.decode(emitted, { skip_special_tokens: true })
 }
 
 export interface ExtractResult {
@@ -360,10 +390,17 @@ export const extract = async (
   const safe = safeTokens(tokenizer)
 
   const cursor = promptIdsFor(tokenizer, keys)
-  // The carrier begins a fresh assistant turn, so re-encoding it on its own
-  // reproduces the ids that were emitted.
+  // Strip the opener: it is part of the prompt both sides derive, and carries
+  // no bits, so decoding starts after it.
+  const opener = openerFor(keys)
+  let body = carrier.trimStart()
+  if (body.toLowerCase().startsWith(opener.toLowerCase())) {
+    // Kept verbatim from here — the leading space is the first emitted
+    // token's own, and trimming it changes the tokenization.
+    body = body.slice(opener.length)
+  }
   const tokens = Array.from(
-    tokenizer.encode(carrier.trim(), { add_special_tokens: false }),
+    tokenizer.encode(body, { add_special_tokens: false }),
   ) as number[]
 
   const recovered: Bit[] = []
