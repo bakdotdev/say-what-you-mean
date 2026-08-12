@@ -8,7 +8,7 @@
 import { useState } from "react"
 import { MAX_SECRET_LENGTH, normalizeSecret } from "../codec"
 import { embed } from "../codec/tokens"
-import { Button, CopyableField, Field, Panel, Tag, TextInput } from "./primitives"
+import { Button, Field, Panel, Tag, TextInput } from "./primitives"
 import { Columns } from "./Columns"
 import { useTokenModel } from "./useTokenModel"
 import { TokenAbout, ModelPanel } from "./TokenShared"
@@ -20,7 +20,14 @@ export function TokenHideView() {
   const [busy, setBusy] = useState(false)
   const [step, setStep] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const model = useTokenModel()
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(carrier)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   const ready = Boolean(secret && passphrase) && !busy
   const words = carrier ? carrier.split(/\s+/).filter(Boolean).length : 0
@@ -29,6 +36,7 @@ export function TokenHideView() {
     setBusy(true)
     setError(null)
     setCarrier("")
+    setCopied(false)
     try {
       if (!(await model.ensure())) return
       const text = await embed(secret, passphrase, (done, total) =>
@@ -106,11 +114,9 @@ export function TokenHideView() {
             }
           >
             {carrier ? (
-              <CopyableField value={carrier} label="copy message" align="top">
-                <p className="whitespace-pre-wrap border border-faint px-3 py-2 text-xs normal-case leading-relaxed text-fg">
-                  {carrier}
-                </p>
-              </CopyableField>
+              <p className="whitespace-pre-wrap border border-faint px-3 py-2 text-xs normal-case leading-relaxed text-fg">
+                {carrier}
+              </p>
             ) : (
               <p className="border border-faint px-3 py-2 text-[10px] leading-relaxed tracking-wider text-muted">
                 {busy
@@ -122,16 +128,14 @@ export function TokenHideView() {
                   : "enter a secret and a passphrase, then write the message."}
               </p>
             )}
-            <div className="mt-3">
-              <Button
-                variant={ready && !carrier ? "ready" : "solid"}
-                onClick={write}
-                disabled={!ready}
-                className="w-full"
-              >
-                {busy ? "working…" : carrier ? "write another" : "write the message"}
-              </Button>
-            </div>
+            <Button
+              variant={carrier ? "ready" : "ghost"}
+              onClick={copy}
+              disabled={!carrier}
+              className="mt-3 w-full"
+            >
+              {copied ? "copied ✓" : "copy message"}
+            </Button>
             {error && (
               <p className="mt-2 text-[10px] leading-relaxed tracking-wider text-fg">
                 {error}
@@ -144,6 +148,14 @@ export function TokenHideView() {
       }
       right={
         <Panel title="status" right={<Tag>{carrier ? "ready" : "idle"}</Tag>}>
+          <Button
+            variant={ready && !carrier ? "ready" : "solid"}
+            onClick={write}
+            disabled={!ready}
+            className="mb-3 w-full"
+          >
+            {busy ? "working…" : carrier ? "write another" : "write the message"}
+          </Button>
           <dl className="space-y-1 text-[10px] tracking-wider">
             <Row label="words" value={carrier ? String(words) : "—"} />
             <Row
