@@ -1,7 +1,7 @@
 /**
  * Version and mode in the URL, so a view can be linked to directly.
  *
- *   ?v=v1|v2            which scheme
+ *   ?v=v1|v2|v3         which scheme
  *   ?mode=hide|reveal   which direction
  *   ?enc=compact|durable  v1 embedding: shortest carrier vs edit-tolerant
  *
@@ -11,11 +11,11 @@
  */
 import { useCallback, useEffect, useState } from "react"
 
-export type Version = "v1" | "v2"
+export type Version = "v1" | "v2" | "v3"
 export type Mode = "hide" | "reveal"
 export type Encoding = "compact" | "durable"
 
-const VERSIONS: Version[] = ["v1", "v2"]
+const VERSIONS: Version[] = ["v1", "v2", "v3"]
 const MODES: Mode[] = ["hide", "reveal"]
 const ENCODINGS: Encoding[] = ["compact", "durable"]
 

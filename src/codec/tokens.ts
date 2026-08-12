@@ -33,12 +33,13 @@
  * Delete or change one word and every word after it decodes garbage. v1
  * survives sixty deletions; this survives none.
  */
-import {
-  AutoModelForCausalLM,
-  AutoTokenizer,
-  Tensor,
-  type PreTrainedModel,
-  type PreTrainedTokenizer,
+// Imported for its runtime only inside loadModel. A static import puts the
+// whole library plus onnxruntime into the main bundle, which every v1 and v2
+// visitor would then download without ever using it.
+import type {
+  PreTrainedModel,
+  PreTrainedTokenizer,
+  Tensor as TensorType,
 } from "@huggingface/transformers"
 import { deriveKeys, type Keys } from "./keys"
 import { buildPayload, parsePayload, payloadBitLength } from "./payload"
@@ -86,9 +87,16 @@ export interface LoadProgress {
   total?: number
 }
 
+type TensorCtor = new (
+  type: string,
+  data: BigInt64Array,
+  dims: number[],
+) => TensorType
+
 let cached: Promise<{
   model: PreTrainedModel
   tokenizer: PreTrainedTokenizer
+  Tensor: TensorCtor
 }> | null = null
 
 /**
@@ -110,6 +118,9 @@ export const loadModel = (onProgress?: (p: LoadProgress) => void) => {
           total: item.total,
         })
       }
+      const { AutoModelForCausalLM, AutoTokenizer, Tensor } = await import(
+        "@huggingface/transformers"
+      )
       const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, {
         progress_callback: report,
       })
@@ -117,7 +128,7 @@ export const loadModel = (onProgress?: (p: LoadProgress) => void) => {
         dtype: "q8",
         progress_callback: report,
       })
-      return { model, tokenizer }
+      return { model, tokenizer, Tensor: Tensor as unknown as TensorCtor }
     })().catch((err) => {
       // A failed load must not poison every later attempt.
       cached = null
@@ -130,6 +141,7 @@ export const loadModel = (onProgress?: (p: LoadProgress) => void) => {
 /** Next-token logits for a token sequence. */
 const logitsFor = async (
   model: PreTrainedModel,
+  Tensor: TensorCtor,
   ids: number[],
 ): Promise<Float32Array> => {
   const out = (await model({
@@ -165,7 +177,10 @@ const safeTokens = (tokenizer: PreTrainedTokenizer) => {
       const text = tokenizer.decode([id], { skip_special_tokens: false })
       ok =
         text.length > 0 &&
-        !/[\n\r\t]/.test(text) &&
+        // Prose characters only. Instruct models reach for markdown given
+        // half a chance — carriers came back as "**Clean-Ahead Spray" — and
+        // asterisks and hashes are not something a text message contains.
+        /^[A-Za-z0-9 .,!?;:'"()\u2019\u2018\u201c\u201d-]+$/.test(text) &&
         !/\s\s/.test(text) &&
         text === text.normalize("NFC")
       if (ok) {
@@ -308,7 +323,7 @@ export const embed = async (
   passphrase: string,
   onProgress?: (done: number, total: number) => void,
 ): Promise<string> => {
-  const { model, tokenizer } = await loadModel()
+  const { model, tokenizer, Tensor } = await loadModel()
   const keys = await deriveKeys(passphrase)
   const payload = await buildPayload(secret, keys)
   const safe = safeTokens(tokenizer)
@@ -318,7 +333,7 @@ export const embed = async (
 
   let at = 0
   while (at < payload.length) {
-    const tree = huffman(candidates(await logitsFor(model, ids), safe))
+    const tree = huffman(candidates(await logitsFor(model, Tensor, ids), safe))
     const { id, used } = walk(tree, payload, at)
     ids.push(id)
     emitted.push(id)
@@ -340,7 +355,7 @@ export const extract = async (
   carrier: string,
   passphrase: string,
 ): Promise<ExtractResult> => {
-  const { model, tokenizer } = await loadModel()
+  const { model, tokenizer, Tensor } = await loadModel()
   const keys = await deriveKeys(passphrase)
   const safe = safeTokens(tokenizer)
 
@@ -353,7 +368,7 @@ export const extract = async (
 
   const recovered: Bit[] = []
   for (const token of tokens) {
-    const tree = huffman(candidates(await logitsFor(model, cursor), safe))
+    const tree = huffman(candidates(await logitsFor(model, Tensor, cursor), safe))
     const code = codeFor(tree, token)
     if (!code) break
     recovered.push(...code)

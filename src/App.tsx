@@ -1,8 +1,16 @@
+import { lazy, Suspense } from "react"
 import { useUrlState } from "./ui/useUrlState"
 import { HideView } from "./ui/HideView"
 import { RevealView } from "./ui/RevealView"
 import { BindHideView } from "./ui/BindHideView"
 import { BindRevealView } from "./ui/BindRevealView"
+// v3 pulls in the model runtime, so it loads only when someone opens it.
+const TokenHideView = lazy(() =>
+  import("./ui/TokenHideView").then((m) => ({ default: m.TokenHideView })),
+)
+const TokenRevealView = lazy(() =>
+  import("./ui/TokenRevealView").then((m) => ({ default: m.TokenRevealView })),
+)
 import { PageEffect } from "./ui/PageEffect"
 
 
@@ -11,7 +19,7 @@ const TABS: { id: "hide" | "reveal"; label: string; glyph: string }[] = [
   { id: "reveal", label: "reveal message", glyph: "▞" },
 ]
 
-const VERSIONS: { id: "v1" | "v2"; label: string; blurb: string }[] = [
+const VERSIONS: { id: "v1" | "v2" | "v3"; label: string; blurb: string }[] = [
   {
     id: "v1",
     label: "v1",
@@ -21,6 +29,11 @@ const VERSIONS: { id: "v1" | "v2"; label: string; blurb: string }[] = [
     id: "v2",
     label: "v2",
     blurb: "the words are never touched · they unlock a one-read key",
+  },
+  {
+    id: "v3",
+    label: "v3",
+    blurb: "the message picks every word · a sentence, not a page",
   },
 ]
 
@@ -111,10 +124,22 @@ export function App() {
             ) : (
               <RevealView />
             )
-          ) : tab === "hide" ? (
-            <BindHideView />
+          ) : version === "v2" ? (
+            tab === "hide" ? (
+              <BindHideView />
+            ) : (
+              <BindRevealView />
+            )
           ) : (
-            <BindRevealView />
+            <Suspense
+              fallback={
+                <p className="text-[10px] tracking-[0.2em] text-muted">
+                  loading…
+                </p>
+              }
+            >
+              {tab === "hide" ? <TokenHideView /> : <TokenRevealView />}
+            </Suspense>
           )}
         </section>
       </main>
