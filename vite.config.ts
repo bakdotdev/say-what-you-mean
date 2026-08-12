@@ -1,12 +1,13 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite"
+import { dropUnusedWasm } from "./scripts/drop-unused-wasm"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 export default defineConfig({
   // The app is served under this path via the lab shell's rewrite. Build
   // output stays at `dist/` root; vercel.json maps the prefixed URLs back.
   base: "/say-what-you-mean/",
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), dropUnusedWasm()],
   test: {
     environment: "jsdom",
     globals: true,

@@ -61,6 +61,14 @@ export const MODEL_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
  */
 const CANDIDATE_COUNT = 32
 
+/**
+ * Nothing here is served by us. Measured on the deployed page: the app itself
+ * is 242 kB from our origin, the onnxruntime WASM (~4.6 MB) comes from
+ * jsDelivr and the model weights (~145 MB) from the Hugging Face CDN, both on
+ * their bandwidth and cached by the browser afterwards. The cost of v3 is the
+ * user's first-load wait, not our egress.
+ */
+
 const BACKEND =
   typeof window === "undefined" ? ("cpu" as const) : ("wasm" as const)
 
