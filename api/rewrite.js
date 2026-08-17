@@ -16,6 +16,7 @@
  * Protections: same-origin only, small body caps, and a per-IP token bucket.
  */
 
+import { checkBotId } from "botid/server"
 import { originAllowed, clientIp } from "./_origin.js"
 
 export const config = { runtime: "edge" }
@@ -71,6 +72,11 @@ export default async function handler(req) {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405)
 
   if (!originAllowed(req)) return json({ error: "forbidden" }, 403)
+
+  // Origin is spoofable; this is the check that costs an attacker something.
+  if ((await checkBotId({ advancedOptions: { headers: req.headers } })).isBot) {
+    return json({ error: "forbidden" }, 403)
+  }
 
   const ip = clientIp(req)
   if (!withinRateLimit(ip))

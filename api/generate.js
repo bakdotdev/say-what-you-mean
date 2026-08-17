@@ -10,6 +10,7 @@
  * token bucket.
  */
 
+import { checkBotId } from "botid/server"
 import { originAllowed, clientIp } from "./_origin.js"
 
 /**
@@ -120,6 +121,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "method not allowed" })
 
   if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" })
+
+  // The Origin check above is not a security boundary — an Origin header is a
+  // string any client can set or omit, and both get through. This is what
+  // actually establishes that a browser is calling, which matters because
+  // every request here spends model credits.
+  if ((await checkBotId({ advancedOptions: { headers: req.headers } })).isBot) {
+    return res.status(403).json({ error: "forbidden" })
+  }
 
   const ip = clientIp(req)
   if (!withinRateLimit(ip))

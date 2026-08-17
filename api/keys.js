@@ -24,6 +24,7 @@
  * Caveat worth stating: blobs that are never read are not auto-expired here.
  * A sweeper (or a store lifecycle rule) should clear stale keys.
  */
+import { checkBotId } from "botid/server"
 import { put, get, del } from "@vercel/blob"
 
 const PREFIX = "swym/keys"
@@ -39,6 +40,12 @@ export default async function handler(req, res) {
   res.setHeader("cache-control", "no-store")
 
   if (req.method === "POST") {
+    // Writes land in blob storage, so this one is guarded against being used
+    // as free storage. Reads are not: they need an id nobody can invert, and
+    // burning one is the whole point of the scheme.
+    if ((await checkBotId({ advancedOptions: { headers: req.headers } })).isBot) {
+      return res.status(403).json({ error: "forbidden" })
+    }
     const body =
       typeof req.body === "string" ? safeParse(req.body) : (req.body ?? {})
     const { id, blob } = body
