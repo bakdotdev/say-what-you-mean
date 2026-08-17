@@ -19,20 +19,30 @@ const TABS: { id: "hide" | "reveal"; label: string; glyph: string }[] = [
   { id: "reveal", label: "reveal message", glyph: "▞" },
 ]
 
-const VERSIONS: { id: "v1" | "v2" | "v3"; label: string; blurb: string }[] = [
+const REPO = "https://github.com/bakdotdev/say-what-you-mean"
+
+const VERSIONS: {
+  id: "v1" | "v2" | "v3"
+  label: string
+  tech: string
+  blurb: string
+}[] = [
   {
     id: "v1",
     label: "v1",
+    tech: "matrix embedding",
     blurb: "the message is hidden in the words · a passphrase unlocks it",
   },
   {
     id: "v2",
     label: "v2",
+    tech: "text-bound key",
     blurb: "the words are never touched · they unlock a one-read key",
   },
   {
     id: "v3",
     label: "v3",
+    tech: "perturbed sampling",
     blurb: "the message picks every word · a sentence, not a page",
   },
 ]
@@ -103,12 +113,23 @@ export function App() {
                   }
                 >
                   {v.label}
+                  <span className="ml-1.5 hidden text-muted sm:inline">
+                    {v.tech}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
           <p className="mt-1 text-[11px] leading-relaxed tracking-wider text-muted">
-            {VERSIONS.find((v) => v.id === version)!.blurb} — see readme
+            {VERSIONS.find((v) => v.id === version)!.blurb} — see readme ·{" "}
+            <a
+              href={REPO}
+              target="_blank"
+              rel="noreferrer"
+              className="text-fg-dim underline decoration-edge underline-offset-2 transition-colors hover:text-accent"
+            >
+              source
+            </a>
           </p>
         </header>
 
