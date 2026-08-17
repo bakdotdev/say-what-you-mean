@@ -10,3 +10,6 @@ playwright-report
 
 # build artefact; it also embeds local absolute paths
 tsconfig.tsbuildinfo
+
+# design notes and plans — kept locally, not published
+docs/
