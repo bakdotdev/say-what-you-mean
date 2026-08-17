@@ -7,3 +7,6 @@ playwright-report
 *.log
 .DS_Store
 .env*
+
+# build artefact; it also embeds local absolute paths
+tsconfig.tsbuildinfo
