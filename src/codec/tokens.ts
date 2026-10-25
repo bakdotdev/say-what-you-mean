@@ -220,6 +220,24 @@ const safeTokens = (tokenizer: PreTrainedTokenizer) => {
   }
 }
 
+/**
+ * Whether emitted tokens come back as themselves when their text is encoded
+ * again, as the receiver does. Every token passes that test alone, but
+ * neighbours can still merge: " comm" then "ander" reads back as the single
+ * token " commander", which is not a candidate at that step, so extraction
+ * stops there and finds nothing. About one carrier in twenty did this.
+ */
+export const reencodes = (
+  tokenizer: PreTrainedTokenizer,
+  emitted: readonly number[],
+): boolean => {
+  const text = tokenizer.decode(emitted as number[], { skip_special_tokens: true })
+  const again = Array.from(
+    tokenizer.encode(text, { add_special_tokens: false }),
+  ) as number[]
+  return again.length === emitted.length && again.every((id, i) => id === emitted[i])
+}
+
 /** The likeliest safe tokens, most likely first, with their probabilities. */
 const candidates = (
   logits: Float32Array,
@@ -360,20 +378,26 @@ export const promptIdsFor = (
   ) as number[]
 }
 
-/** Hide `secret` in freshly generated text. */
-export const embed = async (
-  secret: string,
-  passphrase: string,
-  onProgress?: (done: number, total: number) => void,
-): Promise<string> => {
-  const { model, tokenizer, Tensor } = await loadModel()
-  const keys = await deriveKeys(passphrase)
-  // Sealed: a fresh nonce per message, so the same secret never yields the
-  // same carrier twice and messages under one passphrase never share a
-  // keystream.
-  const payload = await buildSealedPayload(secret, keys)
-  const safe = safeTokens(tokenizer)
+/**
+ * How many nonces embed tries before giving up. Each try merges with odds of
+ * about one in twenty, so the eighth is never reached in practice.
+ */
+const MAX_ATTEMPTS = 8
 
+/**
+ * Emits tokens for one sealed payload, or returns null as soon as two of
+ * them merge on re-encoding. Excluding merging candidates instead would
+ * change which tokens both sides consider, and every carrier already sent
+ * would stop opening. A fresh nonce draws different words and keeps the
+ * format as it is.
+ */
+const emitTokens = async (
+  { model, tokenizer, Tensor }: Awaited<ReturnType<typeof loadModel>>,
+  keys: Keys,
+  payload: readonly Bit[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<number[] | null> => {
+  const safe = safeTokens(tokenizer)
   const ids = promptIdsFor(tokenizer, keys)
   const emitted: number[] = []
 
@@ -383,13 +407,39 @@ export const embed = async (
     const { id, used } = walk(tree, payload, at)
     ids.push(id)
     emitted.push(id)
+    if (!reencodes(tokenizer, emitted)) return null
     at += used
     onProgress?.(Math.min(at, payload.length), payload.length)
   }
+  return emitted
+}
 
-  // The opener is prompt, not payload, but it ships with the message so the
-  // reader sees a whole sentence. The emitted text keeps its leading space.
-  return openerFor(keys) + tokenizer.decode(emitted, { skip_special_tokens: true })
+/** Hide `secret` in freshly generated text. */
+export const embed = async (
+  secret: string,
+  passphrase: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<string> => {
+  const loaded = await loadModel()
+  const keys = await deriveKeys(passphrase)
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    // Sealed: a fresh nonce per message, so the same secret never yields the
+    // same carrier twice and messages under one passphrase never share a
+    // keystream.
+    const payload = await buildSealedPayload(secret, keys)
+    const emitted = await emitTokens(loaded, keys, payload, onProgress)
+    if (!emitted) continue
+    // The opener is prompt, not payload, but it ships with the message so the
+    // reader sees a whole sentence. The emitted text keeps its leading space.
+    return (
+      openerFor(keys) +
+      loaded.tokenizer.decode(emitted, { skip_special_tokens: true })
+    )
+  }
+  throw new Error(
+    `No carrier read back cleanly in ${MAX_ATTEMPTS} tries. Try again.`,
+  )
 }
 
 export interface ExtractResult {

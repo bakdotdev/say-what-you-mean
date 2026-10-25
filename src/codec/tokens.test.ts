@@ -9,7 +9,7 @@
  * V3_TESTS=1 rather than running in the normal suite.
  */
 import { describe, expect, it } from "vitest"
-import { embed, extract } from "./tokens"
+import { embed, extract, loadModel, reencodes } from "./tokens"
 
 const live = process.env.V3_TESTS ? describe : describe.skip
 
@@ -20,6 +20,30 @@ live("v3 token embedding", () => {
     const result = await extract(carrier, "swordfish")
     expect(result.secret).toBe("DOCK AT 9")
   }, 600_000)
+
+  it("spots neighbouring tokens that merge when re-encoded", async () => {
+    const { tokenizer } = await loadModel()
+    const [comm, ander, commander] = [" comm", "ander", " commander"].map(
+      (text) =>
+        Array.from(tokenizer.encode(text, { add_special_tokens: false })) as number[],
+    )
+    // Each is a single token on its own, so the per-token check passes all three.
+    expect([comm, ander, commander].map((ids) => ids.length)).toEqual([1, 1, 1])
+    expect(reencodes(tokenizer, [...comm, ...ander])).toBe(false)
+    expect(reencodes(tokenizer, commander)).toBe(true)
+  }, 600_000)
+
+  it("opens every carrier it writes", async () => {
+    // Before embed checked for merges, about one carrier in twenty failed
+    // this, so twenty tries catch a regression more often than not.
+    const passphrases = ["swordfish", "tangerine", "blue kettle", "riverbank"]
+    for (let i = 0; i < 20; i++) {
+      const passphrase = passphrases[i % passphrases.length]
+      const carrier = await embed("DOCK AT 9", passphrase)
+      const { secret } = await extract(carrier, passphrase)
+      expect(secret, carrier).toBe("DOCK AT 9")
+    }
+  }, 1_200_000)
 
   it("yields nothing for the wrong passphrase", async () => {
     const carrier = await embed("MEET AT SIX", "swordfish")
