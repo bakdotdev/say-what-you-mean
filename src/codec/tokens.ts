@@ -25,8 +25,9 @@
  *                  the usual culprits, and one of them desynchronises
  *                  everything after it.
  *
- *   CAPACITY       ~4.35 bits of entropy per token, so a 74-bit payload fits
- *                  in 19 tokens. About twenty words, against the ~750 v1
+ *   CAPACITY       ~4.35 bits of entropy per token, so a 9-character secret
+ *                  (74 bits, plus a 32-bit per-message nonce = 106) fits in
+ *                  about 25 tokens. Under thirty words, against the ~750 v1
  *                  needs for the same secret.
  *
  * The trade against v1 is stark and deliberate: this is position-dependent.
@@ -42,7 +43,13 @@ import type {
   Tensor as TensorType,
 } from "@huggingface/transformers"
 import { deriveKeys, type Keys } from "./keys"
-import { buildPayload, parsePayload, payloadBitLength } from "./payload"
+import {
+  buildSealedPayload,
+  parsePayload,
+  parseSealedPayload,
+  payloadBitLength,
+  sealedPayloadBitLength,
+} from "./payload"
 import { MAX_SECRET_LENGTH } from "./alphabet"
 import type { Bit } from "./bytes"
 
@@ -361,7 +368,10 @@ export const embed = async (
 ): Promise<string> => {
   const { model, tokenizer, Tensor } = await loadModel()
   const keys = await deriveKeys(passphrase)
-  const payload = await buildPayload(secret, keys)
+  // Sealed: a fresh nonce per message, so the same secret never yields the
+  // same carrier twice and messages under one passphrase never share a
+  // keystream.
+  const payload = await buildSealedPayload(secret, keys)
   const safe = safeTokens(tokenizer)
 
   const ids = promptIdsFor(tokenizer, keys)
@@ -421,12 +431,20 @@ export const extract = async (
   }
 
   // The length is not known in advance, so try each and let the MAC decide.
-  for (let n = 1; n <= MAX_SECRET_LENGTH; n++) {
-    const size = payloadBitLength(n)
-    if (recovered.length < size) break
-    const parsed = await parsePayload(recovered.slice(0, size), n, keys)
-    if (parsed) {
-      return { secret: parsed.secret, tokens: tokens.length, bits: size }
+  // Sealed (nonce) payloads first; then the original unsealed layout, so
+  // carriers made before the nonce was added still open.
+  const layouts = [
+    { size: sealedPayloadBitLength, parse: parseSealedPayload },
+    { size: payloadBitLength, parse: parsePayload },
+  ]
+  for (const { size: sizeFor, parse } of layouts) {
+    for (let n = 1; n <= MAX_SECRET_LENGTH; n++) {
+      const size = sizeFor(n)
+      if (recovered.length < size) break
+      const parsed = await parse(recovered.slice(0, size), n, keys)
+      if (parsed) {
+        return { secret: parsed.secret, tokens: tokens.length, bits: size }
+      }
     }
   }
   return { secret: null, tokens: tokens.length, bits: recovered.length }
